@@ -14,7 +14,7 @@ proj_name <- "AVITI VS MiSeq Comparison"
 data_directory <- paste0('../data/filtered_seq_data/')
 
 getwd()
-barchart_directory <- paste0("../figures/bar_charts/")
+fig1_directory <- paste0("../figures/Fig1/")
 
 marker = "18S"
 ```
@@ -26,28 +26,13 @@ marker = "18S"
 
 #load libraries
 library(readr) #read csv files
-
 library(dplyr) # for data manipulation
 library(ggplot2) # for plotting data
 library(ggthemes) # for plotting data
 library(magrittr) # for piping commands
-# library(RColorBrewer) # colors for plotting
-# library("viridis") # for color fill 
-
-
 library(tidyverse) # for data manipulation
-# library(phyloseq)
+library(ggh4x) # for facet nested wrap
 
-# library(taxa)
-# library(metacoder)
-# library(ggpubr) # for ggarrange
-# library(reshape2) # for presence/absence fig
-
-
-# library(ggnewscale) # multiple fill color scales
-
-
-# library(ggh4x) # for facet nested wrap
 ```
 
 
@@ -66,6 +51,7 @@ tax.c
 
 #metadata table
 samp.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_meta_filtered.csv")) %>%
+  # reorder the variable sample_source 
   mutate(sample_source = fct_relevel(sample_source,  "CN23 MARS" , "MBTS 17024", "MBTS 20524", "MBTS 22624", "MBTS 25424", "CN24F 150m exp"))
 samp.c
 
@@ -76,7 +62,7 @@ potu.c <- otu.c %>%
   tidyr::pivot_longer( -ASV, names_to ='sample_name',values_to = 'reads' ) %>%
   ungroup() %>%
   group_by(sample_name) %>%
-  mutate(per_tot = reads / sum(reads) *100) %>% #proportions(reads)*100
+  mutate(per_tot = reads / sum(reads) *100) %>% 
   arrange(-reads)
 head(potu.c)
 
@@ -85,7 +71,7 @@ head(potu.c)
 
 
 
-## set lowest taxonomic annotation level for ASVs
+## Adjust taxanomic assignments and set lowest taxonomic annotation level for ASVs
 ```{r}
 
   species_label <- tax.c %>%
@@ -126,6 +112,7 @@ head(potu.c)
   
   mutate(Phylum = case_when(Class == "Filasterea" ~ "Choanozoa", T ~ Phylum)) %>%
   
+  # when taxa level is "unknown", "unassigned", or "no_hit", assign as "unknown"
   mutate(Phylum = case_when(Phylum %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Phylum)) %>% 
   mutate(Class = case_when(Class %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Class)) %>% 
   mutate(Order = case_when(Order %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Order)) %>% 
@@ -135,18 +122,6 @@ head(potu.c)
 
   species_label
 
-
-```
-
-
-```{r}
-
-inner_join(samp.c, potu.c, by = c("sample_name")) %>% 
-  left_join(tax.c) %>%
-  # group_by(Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
-  
-  filter(Phylum %in% c("unknown", "no_hit", "unassigned")) %>% 
-  arrange(-per_tot)
 
 ```
 
@@ -164,6 +139,198 @@ env_data
 
 ```
 
+
+## by sample
+#### all reads - tall
+```{r}
+
+taxas <- c('Species') # , 'Kingdom', 'Class', 'Order', 'Family', 'Genus', 'Species'
+
+print(paste(marker,"results"))
+
+sample_taxa_comp <- env_data %>%
+  filter(reads > 0) 
+
+
+
+for (val in taxas) {
+  taxa_level = sym(val)
+  
+  
+  top_20_spp <- sample_taxa_comp %>% 
+    group_by(Phylum, Class, Order, Family, Genus, Species) %>%
+    mutate(sum_per_tot = sum(per_tot)) %>%
+    distinct(Phylum, Class, Order, Family, Genus, Species, .keep_all = TRUE ) %>%
+    arrange(-sum_per_tot) %>%
+    select( Phylum, Class, Order, Family, Genus, Species, sum_per_tot, sample_source) %>%
+    ungroup() %>%
+    select( Phylum, Class, Order, Family, Genus, Species, sum_per_tot)%>%
+    top_n(20) %>%
+    mutate(top_20_spp = "yes") 
+  
+  
+  large_color_palette_cal <- c("black", "slategray3", "deepskyblue4", "darkgoldenrod4", "lightgoldenrod3",  "indianred1", "violetred3", "#55ad89", "darkseagreen2", "chocolate2", "orange1", 
+                               "sienna4", "hotpink2", "darkolivegreen4", "honeydew2", "goldenrod3", "gold1", "darkmagenta",  "plum3", "slateblue3", "darkslategray3"
+  )
+  
+  select_sample <- sample_taxa_comp %>%
+    full_join(top_20_spp) %>%
+    mutate(top_20_spp = case_when(top_20_spp == "yes" ~ "yes",
+                                  TRUE ~ "no")) %>%
+    mutate(Species = case_when(top_20_spp == "no" ~ paste0("(not top 20 Taxa)"),
+                               TRUE ~ !!taxa_level)) %>%
+    ungroup() %>%
+    select(sample_name, ASV, Phylum, Class, Order, Family, Genus, Species, !!taxa_level,reads, per_tot, sample_source, SAMPLING_station, sequencer, SC, source_depth, depth, depth_round, top_20_spp) %>%
+    group_by(sample_name) %>%
+    mutate(sum_reads = sum(reads)) %>%
+    ungroup() %>%
+    group_by(sample_name, Phylum, Class, Order, Family, Genus, Species) %>%
+    mutate(sum_taxa_reads = sum(reads)) %>%
+    mutate(per_tot_taxa_reads = (sum_taxa_reads/sum_reads)*100) %>%
+    ungroup() %>%
+    distinct(sample_name, Phylum, Class, Order, Family, Genus, Species, .keep_all = TRUE) %>%
+    mutate(sample_source = fct_relevel(sample_source,  "CN23 MARS" , "MBTS 17024", "MBTS 20524", "MBTS 22624", "MBTS 25424", "CN24F 150m exp")) %>%
+    mutate(short_name = "") %>%
+    mutate(short_name = case_when(grepl("eDNA", sample_name) ~ substr(sample_name,1,nchar(sample_name)-9), T ~ short_name)) %>%
+    mutate(short_name = case_when(grepl("CN24F150", sample_name) ~ substr(sample_name,14,nchar(sample_name)-3), T ~ short_name)) %>%
+    mutate(short_name_seq = paste(short_name, sequencer, sep = " - ")) %>%
+    mutate(SC = case_when(sample_source == "CN24F 150m exp" & sequencer == "MiSeq" ~ as.double(substr(sample_name,16,nchar(sample_name)-3)), T ~ SC)) %>%
+    mutate(SAMPLING_station = case_when(SAMPLING_station %in% c("c1", "C1") ~ "C1", T ~ SAMPLING_station),
+           SAMPLING_station = case_when(SAMPLING_station %in% c("MOORING1", "MOORING 1", "Mooring1", "Mooring 1") ~ "M1", T ~ SAMPLING_station),
+           SAMPLING_station = case_when(SAMPLING_station %in% c("MOORING2", "MOORING 2", "Mooring2", "Mooring 2") ~ "M2", T ~ SAMPLING_station),
+           SAMPLING_station = case_when(sample_source == "CN24F 150m exp" ~ paste(SC), T ~ SAMPLING_station)
+    ) %>%
+    mutate(stn_seq = paste0(SAMPLING_station, " - ", depth, "m - ", sequencer))
+  
+  select_sample
+  
+  
+  textcol <- "grey40"
+  print(textcol)
+  
+  
+  sample_line_plot <-  select_sample %>%
+    mutate(ord_fam_gen = "") %>%
+    mutate(ord_fam_gen = paste(Phylum, Class, Order, Family, Genus, Species, sep = ", ")) %>%
+    mutate(ord_fam_gen = case_when(Species ==  "(not top 20 Taxa)" ~ "(not top 20 Taxa)", T ~ ord_fam_gen)) %>%
+    ungroup() %>% 
+    mutate(sample_name_fct = fct_reorder(short_name, depth)) %>%
+    ggplot(aes(y=fct_rev(reorder(stn_seq, depth)), x= per_tot_taxa_reads)) +
+    geom_bar(stat = 'identity', aes(fill = ord_fam_gen), size = .5, color = "black") +
+    labs(title = paste(proj_name, marker, "by sample type"), 
+         # subtitle = "All reads included",
+         y="Station\nDepth(m)\nSequencer", 
+         x="Percent Reads",
+         fill = "Phylum, Class, Order, Family, Genus, Species") +
+    scale_fill_manual(values = large_color_palette_cal) +
+    facet_nested_wrap(sample_source  ~ ., scales = "free_y", ncol = 2, strip.position = "right") +
+    theme(
+      #legend
+      legend.position="right",legend.direction="vertical",
+      legend.text=element_text(colour=textcol,size=17,face="bold"),
+      legend.title=element_text(colour=textcol,size=20,face="bold"),
+      
+      #title
+      plot.title=element_text(size = 22),
+      plot.subtitle = element_text(size = 19),
+      
+      #axes
+      axis.text.x=element_text(size=13,colour=textcol, angle = 0, hjust = 1, vjust = 0.5),  
+      axis.text.y=element_text(size=13,colour=textcol),
+      axis.title.y = element_text(size=17),
+      axis.title.x = element_text(size=17),
+      plot.background=element_blank(),
+      panel.border=element_blank(),
+      panel.background = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.grid.major = element_blank(),
+      strip.text = element_text(size=15, face = "bold", angle = 0),
+      strip.background = element_rect(fill = "white", color = "black")
+    ) +
+    guides(fill=guide_legend(ncol=1, title.position="top"))
+  print(sample_line_plot) 
+  
+  # save as .png
+  filename = paste(fig1_directory, 'Figure1a_top20_taxa_all_samples_', proj_prefix, '_', marker, '.png', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 18, width =25, units = 'in')
+  
+  # save as .svg
+  filename = paste(fig1_directory, 'Figure1a_top20_taxa_all_samples_', proj_prefix, '_', marker, '.svg', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 18, width =25, units = 'in')
+  
+  
+  ################
+  ################
+  ################
+  
+  # Now zoom into the CN23S MARS dataset for a "zoomed in" version of the data to highlight
+  
+  new_labels <- c("0" = "0 m", "20" = "20 m", "60" = "60 m", "100" = "100 m", "200" = "200 m", "250" = "250 m", "300" = "300 m", "400" = "400 m", "500" = "500 m", "600" = "600 m", "700" = "700 m")
+  
+  sample_line_plot <-  select_sample %>% 
+    mutate(ord_fam_gen = "") %>%
+    mutate(ord_fam_gen = paste(Phylum, Class, Order, Family, Genus, Species, sep = ", ")) %>%
+    mutate(ord_fam_gen = case_when(Species ==  "(not top 20 Taxa)" ~ "(not top 20 Taxa)", T ~ ord_fam_gen)) %>%
+    ungroup() %>% 
+    filter(sample_source == "CN23S MARS") %>%
+    ggplot(aes(y=fct_rev(sequencer), x= per_tot_taxa_reads)) + 
+    geom_bar(stat = 'identity', aes(fill = ord_fam_gen), size = .5, color = "black") +
+    labs(title = paste(proj_name, marker, "CN23S MARS samples"), 
+         y="Sequencer\n# of Taxa",
+         x="Percent Reads",
+         fill = "Phylum, Class, Order, Family, Genus, Species") +
+    scale_fill_manual(values = large_color_palette_cal) +
+    facet_nested_wrap( ~ depth_round, scales = "free_y", ncol = 1, strip.position = "right", labeller = as_labeller(new_labels)) +
+    theme(
+      #legend
+      legend.position="right",legend.direction="vertical",
+      legend.text=element_text(colour=textcol,size=17,face="bold"),
+      legend.title=element_text(colour=textcol,size=20,face="bold"),
+      
+      #title
+      plot.title=element_text(size = 22),
+      plot.subtitle = element_text(size = 19),
+      
+      #axes
+      axis.text.x=element_text(size=13,colour=textcol, angle = 0, hjust = 1, vjust = 0.5),  
+      axis.text.y=element_text(size=13,colour=textcol),
+      axis.title.y = element_text(size=17),
+      axis.title.x = element_text(size=17),
+      plot.background=element_blank(),
+      panel.border=element_blank(),
+      panel.background = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.grid.major = element_blank(),
+      strip.text = element_text(size=15, face = "bold", angle = 0),
+      strip.background = element_rect(fill = "white", color = "black"),
+      strip.placement = "left"
+    ) +
+    guides(fill=guide_legend(ncol=1, title.position="top"))
+  print(sample_line_plot) 
+  
+  
+   # save as .png
+  filename = paste(fig1_directory, 'Figure1b_top20_taxa_CN23S_MARS_', proj_prefix, '_', marker, '.png', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 12, width =20, units = 'in')
+  
+  # save as .svg
+  filename = paste(fig1_directory, 'Figure1b_top20_taxa_CN23S_MARS_', proj_prefix, '_', marker, '.svg', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 12, width =20, units = 'in')
+  
+}
+
+
+
+  
+```
 
 
 

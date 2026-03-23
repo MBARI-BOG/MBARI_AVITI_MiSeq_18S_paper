@@ -1,0 +1,1192 @@
+---
+title: "Figure2_RPCAs"
+author: "Jacoby Baker"
+date: "2026-03-23"
+output: html_document
+---
+
+
+# Set up directories and variables
+```{r}
+# setwd('scripts/')
+proj_prefix <- "AVITI_MiSeq_comparison"
+proj_name <- "AVITI VS MiSeq Comparison"
+
+data_directory <- paste0('../data/filtered_seq_data/')
+rarefaction_data <- paste0('../data/rarefaction_data/')
+
+
+getwd()
+fig2_directory <- paste0("../figures/Fig2/")
+# diversity_directory <- paste0("../figures/diversity/")
+rarefaction_directory <- paste0("../figures/rarefaction/")
+deicode_directory <- paste0('../data/DEICODE/18S/')
+# barchart_directory <- paste0("../figures/bar_charts/")
+
+marker = "18S"
+```
+
+
+
+# Load libraries
+```{r}
+
+#load libraries
+library(qiime2R)
+library(readr) #read csv files
+library(lubridate) #for date modifications
+library(vegan)
+
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(magrittr) # for piping commands
+library(RColorBrewer) #colors for plotting
+library("viridis") # for color fill 
+
+
+library(ggalt)
+
+
+library(tidyverse)
+library(phyloseq)
+
+# library(taxa)
+library(dplyr)
+# library(metacoder)
+# library(ggpubr) # for ggarrange
+# library(reshape2) # for presence/absence fig
+# 
+# library("ape") # to make phylo tree in phyloseq obj
+# library(ggtree) # for phylogenetic tree
+# library(ggtreeExtra) # for aligning graph layers to outerside of ggtree
+# 
+# library(ggnewscale) # multiple fill color scales
+
+library(rstatix) # alpha diversity stats kruskal-wallis
+```
+
+
+
+
+# Load in Data
+```{r}
+
+#ASV table
+otu.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_asv_filtered.csv"))
+otu.c
+
+#taxa table
+tax.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_taxa_filtered.csv"))
+tax.c
+
+#metadata table
+samp.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_meta_filtered.csv")) %>%
+  # reorder the variable sample_source 
+  mutate(sample_source = fct_relevel(sample_source,  "CN23 MARS" , "MBTS 17024", "MBTS 20524", "MBTS 22624", "MBTS 25424", "CN24F 150m exp"))
+samp.c
+
+
+
+#OTU table long format with percent total reads
+potu.c <- otu.c %>%
+  tidyr::pivot_longer( -ASV, names_to ='sample_name',values_to = 'reads' ) %>%
+  ungroup() %>%
+  group_by(sample_name) %>%
+  mutate(per_tot = reads / sum(reads) *100) %>% 
+  arrange(-reads)
+head(potu.c)
+
+
+```
+
+
+
+## set lowest taxonomic annotation level for ASVs
+```{r}
+
+  species_label <- tax.c  %>%
+  # assign  algae
+  mutate(Phylum = case_when(Class == "Raphidophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Phaeophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Pelagophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Dictyochophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Chrysophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Synurophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Bolidophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Eustigmatophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  # assign oomycotes
+  mutate(Phylum = case_when(Class == "Oomycota" ~ "Oomycota", T ~ Phylum))  %>%
+  mutate(Phylum = case_when(Class == "Oomycetes" ~ "Oomycota", T ~ Phylum))%>%
+  # assign microeuk
+  mutate(Phylum = case_when(Class == "Bigyra" ~ "Bigyra", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Choanoflagellata" ~ "Choanoflagellata", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Cryptophyceae" ~ "Cryptista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Order == "Telonemida" ~ "Cryptista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Haptophyta" ~ "Haptista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Centroplasthelida" ~ "Haptista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Ichthyosporea" ~ "Choanozoa", T ~ Phylum))  %>% 
+  
+  mutate(Class = case_when(Phylum == "Imbricatea" ~ "Imbricatea", T ~ Class)) %>%
+  mutate(Phylum = case_when(Class == "Imbricatea" ~ "Cercozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Polycystinea" ~ "Retaria", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Acantharea" ~ "Retaria", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Breviatea" ~ "Sulcozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Aphelidea" ~ "Aphelida", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Filasterea" ~ "Choanozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Phylum %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Phylum)) %>% 
+  mutate(Class = case_when(Class %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Class)) %>% 
+  mutate(Order = case_when(Order %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Order)) %>% 
+  mutate(Family = case_when(Family %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Family)) %>% 
+  mutate(Genus = case_when(Genus %in% c("unknown", "unassigned", "no_hit", "g_") ~ "unknown", T ~ Genus)) %>% 
+  mutate(Species = case_when(Species %in% c("unknown", "unassigned", "no_hit", "s_") ~ "unknown", T ~ Species))
+
+  species_label
+
+
+```
+
+
+
+
+# PHYLOSEQ  
+define function
+```{r}
+vegan_otu <- function(physeq) {
+  OTU <- otu_table(physeq)
+  if (taxa_are_rows(OTU)) {
+    OTU <- t(OTU)
+  }
+  return(as(OTU, "matrix"))
+}
+```
+
+
+# ##### Non rarefied data #####
+## ## Figure 2 A - All samples, not rarefied, all reads
+
+### create Phyloseq object 
+```{r}
+
+  
+  subset = c("all_reads")
+  Sys.setenv(subset = subset)
+  
+  metadata_updated <- samp.c
+  
+
+  
+species_label <- tax.c %>% column_to_rownames(var = "ASV")
+  
+  rownames(metadata_updated) <- NULL
+  metadata_updated <- column_to_rownames(metadata_updated,"sample_name")
+  
+  
+  phylo <- merge_phyloseq(otu_table(as.matrix(read.csv(paste0(data_directory, proj_prefix, "_", marker, "_asv_filtered.csv"), row.names = 1,check.names = FALSE)),taxa_are_rows = TRUE),
+                          tax_table(as.matrix(species_label)),
+                          sample_data(metadata_updated))
+  
+  phylo
+
+    sample_data(phylo)
+  
+  phylo_obj <- phylo
+
+  phylo_obj_env <- prune_samples(sample_data(phylo)$sample_type %in% c("environmental"), phylo) 
+  
+  
+  
+  
+  
+  sample_data(phylo_obj)
+  sample_data(phylo_obj_env)
+  # sample_data(phylo_obj_cb)
+  
+  # Create Tables -----------------------------------------------------------
+  
+  #create vegan tables
+  vegan_matrix_env=vegan_otu(phylo_obj_env)
+  otu_tab_env=otu_table(phylo_obj_env)
+  tax_tab_env= tax_table(phylo_obj_env)
+  samp_dat_env <- sample_data(phylo_obj_env)
+  
+  # Rarefy ------------------------------------------------------------------
+  #print(sample_sums(phylo_obj_env))
+  print(min(sample_sums(phylo_obj_env)))
+  print(max(sample_sums(phylo_obj_env)))
+  print(mean(sample_sums(phylo_obj_env)))
+  print(phylo_obj_env)
+  # # Remove samples with <5000 reads (like DEICODE)
+  # oBiom_r_env = prune_samples(sample_sums(phylo_obj_env)>=5000, phylo_obj_env)
+  # #set random seed for reproducibility later
+  # print(min(sample_sums(oBiom_r_env)))
+  # oBiom_r_env = rarefy_even_depth(oBiom_r_env, sample.size = min(sample_sums(oBiom_r_env)), rngseed = 678, replace = FALSE, trimOTUs = TRUE, verbose = TRUE)
+  # print(oBiom_r_env)
+  # assign(paste0("oBiom_r_env_",marker),oBiom_r_env)
+  # 
+  # #create matrixes
+  # rvegan_matrix_env=vegan_otu(oBiom_r_env)
+  # rotu_tab_env=otu_table(oBiom_r_env)
+  # rtax_tab_env= tax_table(oBiom_r_env)
+  # rsamp_dat_env <- sample_data(oBiom_r_env)
+  # 
+  # #save rarefied data
+  # #save to csv file
+  # file = paste(rarefaction_data,marker,'_env_Non-Rarefied_asv_table_',subset,'.csv', sep="")
+  # write.csv(otu_tab_env, file)
+  # file = paste(rarefaction_data,marker,'_env_Non-Rarefied_taxa_table_',subset,'.csv', sep="")
+  # write.csv(tax_tab_env, file)
+  # # file = paste(rarefaction_data,marker,'_env_Non-Rarefied_meta_table_',subset,'.csv', sep="")
+  # # write.csv(samp_dat_env, file)
+  # 
+  # file = paste(rarefaction_data,marker,'_env_Rarefied_asv_table_',subset,'.csv', sep="")
+  # write.csv(rotu_tab_env, file)
+  # file = paste(rarefaction_data,marker,'_env_Rarefied_taxa_table_',subset,'.csv', sep="")
+  # write.csv(rtax_tab_env, file)
+  # # file = paste(rarefaction_data,marker,'_env_Rarefied_meta_table_',subset,'.csv', sep="")
+  # # write.csv(rsamp_dat_env, file)
+  
+  
+  ### DEICODE PCA 
+  # environmental samples
+  phylo_obj_env_asv_table <- as.data.frame(otu_table(phylo_obj_env))
+  phylo_obj_env_asv_table <- rownames_to_column(phylo_obj_env_asv_table,"#OTUID")
+  write.table(phylo_obj_env_asv_table,paste0(deicode_directory,"/phylo_obj_env_",marker,"_asv_table_for_biom_",subset,".txt"),sep = "\t",row.names = FALSE,quote = FALSE)
+  phylo_obj_env_tax_table <- as.data.frame(as(tax_table(phylo_obj_env),"matrix"))
+  phylo_obj_env_tax_table <- rownames_to_column(phylo_obj_env_tax_table,"#OTUID")
+  write.table(phylo_obj_env_tax_table,paste0(deicode_directory,"/phylo_obj_env_",marker,"_tax_table_for_biom_",subset,".txt"),sep = "\t",row.names = FALSE,quote = FALSE)
+  phylo_obj_env_metadata <- as.data.frame(as.matrix(sample_data(phylo_obj_env)))
+  phylo_obj_env_metadata <- rownames_to_column(phylo_obj_env_metadata,"#SampleID")
+  write.table(phylo_obj_env_metadata,paste0(deicode_directory,"/phylo_obj_env_",marker,"_metadata_for_biom_",subset,".txt"),sep = "\t",row.names = FALSE,quote = FALSE)
+  
+
+  
+```
+
+
+### DEICODE
+#### deicode PCA use a loop to jump into each of the folders for the three markers for all samples
+```{bash engine.opts='-l'}
+# move into the directory where you are going to run the DEICODE script
+cd ../data/DEICODE
+pwd
+
+
+# Activate the conda qiime2 enviroment - check version
+conda activate qiime2-2022.11
+
+for folder in 18S  
+do
+  for data in phylo_obj_env
+
+  do
+  cd $folder
+  #!/usr/bin/env bash
+
+  # This bash script can be run with bash deicode_template_072820.sh
+  # All of the input files (asv_table_for_deicode.txt, tax_table_for_deicode.txt, and metadata_for_deicode.txt) must be in the   same directory as this script.
+
+  ### Description ###
+  #
+  # You will need qiime2 and DEICODE installed on your machine in order for it to work.
+  # You will have four outputs: 1) distance.qza, 2) ordination.qza, 3) biplot.qza, and 4_ qurro_plot_deicoderank.qzv
+  # Of these outputs, the most import one is the "ordination.qza" file - this is what you will use in R
+  # biplot.qza can be visualized at view.qiime2.org, and is an interactive way to view your PCA.
+  # qurro_plot_deicoderank.qzv will show you the loadings of your taxa on the different PCs.
+
+  #Make biom file
+    biom convert -i ./${data}_${folder}_asv_table_for_biom_${subset}.txt -o table.from_txt_json_${data}_${subset}.biom --table-type="OTU table" --to-json
+  #add metadata files to biom file - change the merged_tax_table_for_biomm.txt and _merged_for_biom.txt files
+   biom add-metadata -i table.from_txt_json_${data}_${subset}.biom -o table.w_md_${data}_${subset}.biom --observation-metadata-fp ${data}_${folder}_tax_table_for_biom_${subset}.txt --sample-metadata-fp ${data}_${folder}_metadata_for_biom_${subset}.txt
+
+  #import into Qiime2 - Change output file
+    qiime tools import \
+     --input-path table.w_md_${data}_${subset}.biom \
+     --output-path ${data}_${folder}_master_${subset}.biom.qza \
+     --type FeatureTable[Frequency]
+
+  #run DEICODE - change input table
+    qiime deicode rpca \
+      --i-table ${data}_${folder}_master_${subset}.biom.qza \
+      --p-n-components 3 \
+      --p-min-feature-count 10 \
+      --p-min-sample-count 5000 \
+      --o-biplot ordination_${data}_${subset}.qza \
+      --o-distance-matrix distance_${data}_${subset}.qza
+
+  ## Create biplot - change metadata files
+    qiime emperor biplot \
+      --i-biplot ordination_${data}_${subset}.qza \
+      --m-sample-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --m-feature-metadata-file ${data}_${folder}_tax_table_for_biom_${subset}.txt \
+      --o-visualization biplot_${data}_${subset}.qzv \
+      --p-number-of-features 8
+
+  # Create Qurro Visualization - change metadata files
+    qiime qurro loading-plot \
+      --i-ranks ordination_${data}_${subset}.qza \
+      --i-table ${data}_${folder}_master_${subset}.biom.qza \
+      --m-sample-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --m-feature-metadata-file ${data}_${folder}_tax_table_for_biom_${subset}.txt \
+      --o-visualization qurro_plot_deicoderank_${data}_${subset}.qzv
+
+   # Run a permanova | permdisp | or anosim test between whatever metadata column you choose (argument --m-metadata-column [column of choosing])
+     qiime diversity beta-group-significance \
+      --i-distance-matrix distance_${data}_${subset}.qza \
+      --m-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --m-metadata-column sequencer \
+      --p-method anosim \
+      --o-visualization sequencer_significance_anosim_${data}_${subset}.qzv
+
+    # Alpha diversity test
+    #Shannon
+     qiime diversity alpha \
+       --i-table ${data}_${folder}_master_${subset}.biom.qza \
+       --p-metric shannon \
+       --o-alpha-diversity ${data}_${folder}_shannon_alpha_${subset}.qza
+
+      qiime diversity alpha-group-significance \
+      --i-alpha-diversity ${data}_${folder}_shannon_alpha_${subset}.qza \
+      --m-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --o-visualization ${data}_${folder}_shannon_alpha_${subset}.qzv
+      
+      #Chao1
+      qiime diversity alpha \
+       --i-table ${data}_${folder}_master_${subset}.biom.qza \
+       --p-metric chao1 \
+       --o-alpha-diversity ${data}_${folder}_chao1_alpha_${subset}.qza
+
+      qiime diversity alpha-group-significance \
+      --i-alpha-diversity ${data}_${folder}_chao1_alpha_${subset}.qza \
+      --m-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --o-visualization ${data}_${folder}_chao1_alpha_${subset}.qzv
+      
+      #Observed OTUs
+      qiime diversity alpha \
+       --i-table ${data}_${folder}_master_${subset}.biom.qza \
+       --p-metric observed_features \
+       --o-alpha-diversity ${data}_${folder}_observed_otus_alpha_${subset}.qza
+
+      qiime diversity alpha-group-significance \
+      --i-alpha-diversity ${data}_${folder}_observed_otus_alpha_${subset}.qza \
+      --m-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --o-visualization ${data}_${folder}_observed_otus_alpha_${subset}.qzv
+   done
+
+  cd ../
+done
+
+```
+
+
+
+
+#### RPCA of all samples, non rarefied
+```{r}
+
+#Import Qiime2 Results
+file = paste(deicode_directory,"/ordination_phylo_obj_env_",subset,".qza",sep="")
+print(file)
+pco<-read_qza(file)
+pco$uuid
+#look at data
+head(pco$data$ProportionExplained)
+pco$data$Vectors[1:5, 1:4]
+
+#create proportion explained labels
+label.PC1 <- paste("PC1: ", round(pco$data$ProportionExplained$PC1, 3)*100,"%")
+label.PC1
+label.PC2 <- paste("PC2: ", round(pco$data$ProportionExplained$PC2, 3)*100,"%")
+label.PC2
+label.PC3 <- paste("PC3: ", round(pco$data$ProportionExplained$PC3, 3)*100,"%")
+label.PC3
+
+#Join with sample data
+pco$data$Vectors <- pco$data$Vectors %>% 
+  rename(., "sample_name" = "SampleID" )
+
+pcscores <- left_join(pco$data$Vectors, samp.c)
+
+
+#format loading scores
+loadings <- as.data.frame(pco$data$Species)
+loadings$ASV <- loadings$FeatureID
+
+#join on OTU, adding taxa info
+loadings <- left_join(loadings, tax.c, by="ASV")
+
+#export pcscores
+file = paste(deicode_directory,"scores/pcscores_",marker,"_phylo_obj_env_Dada2_Qiime2_",subset,".csv",sep="")
+print(file)
+write.csv(pcscores, file)
+file = paste(deicode_directory,"scores/loadings_",marker,"_phylo_obj_env_Dada2_Qiime2_",subset,".csv",sep="")
+print(file)
+write.csv(loadings, file)
+pcscores[1:5, 1:9]  #long because of sample data
+head(loadings)
+
+
+# Plot RPCA ---------------------------------------------------------------
+
+cols6 <- c("navyblue", "goldenrod3", "darkmagenta", "firebrick", "firebrick2", "darkolivegreen4", "violetred3")
+
+# plot inverse of PC1 and PC2 values so the pattern matches more with the rarefied PCA (e.g., the 150m ESP samples in the same quadrant)
+
+pcscores %>% mutate(depth_bin = case_when(depth >= 0 & depth <= 20 ~ "0-20"), 
+                        depth_bin = case_when(depth == 60 ~ "60", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 100 ~ "100", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 150 ~ "150", T ~ depth_bin), 
+                        depth_bin = case_when(depth >= 200 & depth <= 700 ~ "200-700", T ~ depth_bin),
+                        depth_bin = case_when(sample_source == "CN24F 150m exp" ~ "150 - benchtop experiment", T ~ depth_bin),
+                        depth_bin = fct_relevel(depth_bin, "0-20", "60", "100", "150", "150 - benchtop experiment", "200-700"),
+                        source_depth_bin = paste(sample_source, depth_bin, sep = " - "),
+                        source_depth_bin = reorder(source_depth_bin, depth)) %>% 
+  ggplot(aes(-PC1,-PC2, fill=depth_bin)) +
+  geom_line(aes(group = original_name, color = depth_bin), linetype = 2, alpha = 0.7) +
+  geom_point(size=4, alpha=0.8, aes(shape = sequencer, color = depth_bin)) + 
+  scale_shape_manual(values = c(21, 1)) +
+    scale_fill_manual(values = cols6) +
+    scale_color_manual(values = cols6, guide="none") +
+  labs(x=label.PC1 , 
+       y=label.PC2, 
+       fill = "Depth Bin (m)",
+       shape = "Sequencer",
+       subtitle = "Comparison between sequencers\nLines connect sample replicates",
+       title = "RPCA - non rarefied data, all reads"  )+ 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        legend.text = element_text(size = 12, colour = "black"),
+        legend.title = element_text(face = "bold", size=12),
+        legend.key = element_rect(fill = FALSE, colour = FALSE),
+        legend.key.size = unit(0.1,"line"),
+        plot.title = element_text(size = 22),
+        plot.subtitle = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 15)
+  )+ guides(fill = guide_legend(override.aes = list(size=5, shape=c(21))),
+            shape = guide_legend(override.aes = list(size = 5, shape = c(19, 1))))
+
+
+filename = paste(fig2_directory, 'Figure2a_RPCA_by_depth_bin_inverse_',marker,"_",subset,'.png', sep='')
+print('Plot of PC1PC2 colored by Year:')
+filename
+ggsave(filename,height = 9, width =10, units = 'in')
+
+
+```
+
+
+
+# ##### Rarefied data #####
+## ## Figure 2 B - all samples, rarefied data, all reads
+
+### create Phyloseq object of all  samples
+```{r}
+
+  
+  subset = c("Rarefied_data")
+  Sys.setenv(subset = subset)
+  
+  metadata_updated <- samp.c %>% mutate(depth_bin = case_when(depth >= 0 & depth <= 20 ~ "0-20"), 
+                        depth_bin = case_when(depth == 60 ~ "60", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 100 ~ "100", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 150 ~ "150", T ~ depth_bin), 
+                        depth_bin = case_when(depth >= 200 & depth <= 700 ~ "200-700", T ~ depth_bin),
+                        depth_bin = case_when(sample_source == "CN24F 150m exp" ~ "150 - benchtop experiment", T ~ depth_bin),
+                        depth_bin = fct_relevel(depth_bin, "0-20", "60", "100", "150", "150 - benchtop experiment", "200-700"))
+  
+
+  
+species_label <- tax.c %>% column_to_rownames(var = "ASV")
+  
+  rownames(metadata_updated) <- NULL
+  metadata_updated <- column_to_rownames(metadata_updated,"sample_name")
+  
+  
+  phylo <- merge_phyloseq(otu_table(as.matrix(read.csv(paste0(data_directory, proj_prefix, "_", marker, "_asv_filtered.csv"), row.names = 1,check.names = FALSE)),taxa_are_rows = TRUE),
+                          tax_table(as.matrix(species_label)),
+                          sample_data(metadata_updated))
+  
+  phylo
+
+    sample_data(phylo)
+  
+  phylo_obj <- phylo
+
+  phylo_obj_env <- prune_samples(sample_data(phylo)$sample_type %in% c("environmental"), phylo) 
+  
+  
+  
+  
+  
+  sample_data(phylo_obj)
+  sample_data(phylo_obj_env)
+  # sample_data(phylo_obj_cb)
+  
+  # Create Tables -----------------------------------------------------------
+  
+  #create vegan tables
+  vegan_matrix_env=vegan_otu(phylo_obj_env)
+  otu_tab_env=otu_table(phylo_obj_env)
+  tax_tab_env= tax_table(phylo_obj_env)
+  samp_dat_env <- sample_data(phylo_obj_env)
+  
+  # Rarefy ------------------------------------------------------------------
+  #print(sample_sums(phylo_obj_env))
+  print(min(sample_sums(phylo_obj_env)))
+  print(max(sample_sums(phylo_obj_env)))
+  print(mean(sample_sums(phylo_obj_env)))
+  print(phylo_obj_env)
+  # Remove samples with <500 reads (like DEICODE)
+  oBiom_r_env = prune_samples(sample_sums(phylo_obj_env)>=5000, phylo_obj_env)
+  #set random seed for reproducibility later
+  print(min(sample_sums(oBiom_r_env)))
+  oBiom_r_env = rarefy_even_depth(oBiom_r_env, sample.size = min(sample_sums(oBiom_r_env)), rngseed = 678, replace = FALSE, trimOTUs = TRUE, verbose = TRUE)
+  print(oBiom_r_env)
+  assign(paste0("oBiom_r_env_",marker),oBiom_r_env)
+  
+  #create matrixes
+  rvegan_matrix_env=vegan_otu(oBiom_r_env)
+  rotu_tab_env=otu_table(oBiom_r_env)
+  rtax_tab_env= tax_table(oBiom_r_env)
+  rsamp_dat_env <- rownames_to_column(as.data.frame(as.matrix(sample_data(oBiom_r_env))), var = "sample_name") #sample_data(oBiom_r_env)
+  
+  #save rarefied data
+  # #save to csv file
+  file = paste(rarefaction_data,marker,'_env_Non-Rarefied_asv_table_',subset,'.csv', sep="")
+  write.csv(otu_tab_env, file)
+  file = paste(rarefaction_data,marker,'_env_Non-Rarefied_taxa_table_',subset,'.csv', sep="")
+  write.csv(tax_tab_env, file)
+  # file = paste(rarefaction_data,marker,'_env_Non-Rarefied_meta_table_',subset,'.csv', sep="")
+  # write.csv(samp_dat_env, file)
+
+  file = paste(rarefaction_data,marker,'_env_Rarefied_asv_table_',subset,'.csv', sep="")
+  write.csv(rotu_tab_env, file)
+  file = paste(rarefaction_data,marker,'_env_Rarefied_taxa_table_',subset,'.csv', sep="")
+  write.csv(rtax_tab_env, file)
+  file = paste(rarefaction_data,marker,'_env_Rarefied_meta_table_',subset,'.csv', sep="")
+  write.csv(rsamp_dat_env, file)
+  
+  
+  ### DEICODE PCA 
+  # rarefied
+  phylo_obj_env_asv_table <- as.data.frame(otu_table(oBiom_r_env))
+  phylo_obj_env_asv_table <- rownames_to_column(phylo_obj_env_asv_table,"#OTUID")
+  write.table(phylo_obj_env_asv_table,paste0(deicode_directory,"/oBiom_r_env_",marker,"_asv_table_for_biom_",subset,".txt"),sep = "\t",row.names = FALSE,quote = FALSE)
+ 
+  phylo_obj_env_tax_table <- as.data.frame(as(tax_table(oBiom_r_env),"matrix"))
+  phylo_obj_env_tax_table <- rownames_to_column(phylo_obj_env_tax_table,"#OTUID")
+  write.table(phylo_obj_env_tax_table,paste0(deicode_directory,"/oBiom_r_env_",marker,"_tax_table_for_biom_",subset,".txt"),sep = "\t",row.names = FALSE,quote = FALSE)
+  
+  phylo_obj_env_metadata <- as.data.frame(as.matrix(sample_data(oBiom_r_env)))
+  phylo_obj_env_metadata <- rownames_to_column(phylo_obj_env_metadata,"#SampleID")
+  write.table(phylo_obj_env_metadata,paste0(deicode_directory,"/oBiom_r_env_",marker,"_metadata_for_biom_",subset,".txt"),sep = "\t",row.names = FALSE,quote = FALSE)
+  
+
+  
+```
+
+
+### DEICODE
+#### deicode PCA use a loop to jump into each of the folders for the three markers for all samples
+```{bash engine.opts='-l'}
+# move into the directory where you are going to run the DEICODE script
+cd ../data/DEICODE
+pwd
+
+
+# Activate the conda qiime2 enviroment - check version
+conda activate qiime2-2022.11
+
+for folder in 18S  #for folder in 12S 18S COI
+do
+  #for data in phylo_obj phylo_obj_env phylo_obj_cb
+  for data in oBiom_r_env
+
+  do
+  cd $folder
+  #!/usr/bin/env bash
+
+  # This bash script can be run with bash deicode_template_072820.sh
+  # All of the input files (asv_table_for_deicode.txt, tax_table_for_deicode.txt, and metadata_for_deicode.txt) must be in the   same directory as this script.
+
+  ### Description ###
+  #
+  # You will need qiime2 and DEICODE installed on your machine in order for it to work.
+  # You will have four outputs: 1) distance.qza, 2) ordination.qza, 3) biplot.qza, and 4_ qurro_plot_deicoderank.qzv
+  # Of these outputs, the most import one is the "ordination.qza" file - this is what you will use in R
+  # biplot.qza can be visualized at view.qiime2.org, and is an interactive way to view your PCA.
+  # qurro_plot_deicoderank.qzv will show you the loadings of your taxa on the different PCs.
+
+  #Make biom file
+    biom convert -i ./${data}_${folder}_asv_table_for_biom_${subset}.txt -o table.from_txt_json_${data}_${subset}.biom --table-type="OTU table" --to-json
+  #add metadata files to biom file - change the merged_tax_table_for_biomm.txt and _merged_for_biom.txt files
+   biom add-metadata -i table.from_txt_json_${data}_${subset}.biom -o table.w_md_${data}_${subset}.biom --observation-metadata-fp ${data}_${folder}_tax_table_for_biom_${subset}.txt --sample-metadata-fp ${data}_${folder}_metadata_for_biom_${subset}.txt
+
+  #import into Qiime2 - Change output file
+    qiime tools import \
+     --input-path table.w_md_${data}_${subset}.biom \
+     --output-path ${data}_${folder}_master_${subset}.biom.qza \
+     --type FeatureTable[Frequency]
+
+  #run DEICODE - change input table
+    qiime deicode rpca \
+      --i-table ${data}_${folder}_master_${subset}.biom.qza \
+      --p-n-components 3 \
+      --p-min-feature-count 10 \
+      --p-min-sample-count 5000 \
+      --o-biplot ordination_${data}_${subset}.qza \
+      --o-distance-matrix distance_${data}_${subset}.qza
+
+  ## Create biplot - change metadata files
+    qiime emperor biplot \
+      --i-biplot ordination_${data}_${subset}.qza \
+      --m-sample-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --m-feature-metadata-file ${data}_${folder}_tax_table_for_biom_${subset}.txt \
+      --o-visualization biplot_${data}_${subset}.qzv \
+      --p-number-of-features 8
+
+  # Create Qurro Visualization - change metadata files
+    qiime qurro loading-plot \
+      --i-ranks ordination_${data}_${subset}.qza \
+      --i-table ${data}_${folder}_master_${subset}.biom.qza \
+      --m-sample-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --m-feature-metadata-file ${data}_${folder}_tax_table_for_biom_${subset}.txt \
+      --o-visualization qurro_plot_deicoderank_${data}_${subset}.qzv
+
+   # Run a permanova | permdisp | or anosim test between whatever metadata column you choose (argument --m-metadata-column [column of choosing])
+     qiime diversity beta-group-significance \
+      --i-distance-matrix distance_${data}_${subset}.qza \
+      --m-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --m-metadata-column sequencer \
+      --p-method anosim \
+      --o-visualization sequencer_significance_anosim_${data}_${subset}.qzv
+
+    # Alpha diversity test
+    #Shannon
+     qiime diversity alpha \
+       --i-table ${data}_${folder}_master_${subset}.biom.qza \
+       --p-metric shannon \
+       --o-alpha-diversity ${data}_${folder}_shannon_alpha_${subset}.qza
+
+      qiime diversity alpha-group-significance \
+      --i-alpha-diversity ${data}_${folder}_shannon_alpha_${subset}.qza \
+      --m-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --o-visualization ${data}_${folder}_shannon_alpha_${subset}.qzv
+      
+      #Chao1
+      qiime diversity alpha \
+       --i-table ${data}_${folder}_master_${subset}.biom.qza \
+       --p-metric chao1 \
+       --o-alpha-diversity ${data}_${folder}_chao1_alpha_${subset}.qza
+
+      qiime diversity alpha-group-significance \
+      --i-alpha-diversity ${data}_${folder}_chao1_alpha_${subset}.qza \
+      --m-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --o-visualization ${data}_${folder}_chao1_alpha_${subset}.qzv
+      
+      #Observed OTUs
+      qiime diversity alpha \
+       --i-table ${data}_${folder}_master_${subset}.biom.qza \
+       --p-metric observed_features \
+       --o-alpha-diversity ${data}_${folder}_observed_otus_alpha_${subset}.qza
+
+      qiime diversity alpha-group-significance \
+      --i-alpha-diversity ${data}_${folder}_observed_otus_alpha_${subset}.qza \
+      --m-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --o-visualization ${data}_${folder}_observed_otus_alpha_${subset}.qzv
+   done
+
+  cd ../
+done
+
+```
+
+
+
+
+#### RPCA of all samples, rarefied data
+```{r}
+
+
+#Import Qiime2 Results
+file = paste(deicode_directory,"ordination_oBiom_r_env_",subset,".qza",sep="")
+print(file)
+pco<-read_qza(file)
+pco$uuid
+#look at data
+head(pco$data$ProportionExplained)
+pco$data$Vectors[1:5, 1:4]
+
+#create proportion explained labels
+label.PC1 <- paste("PC1: ", round(pco$data$ProportionExplained$PC1, 3)*100,"%")
+label.PC1
+label.PC2 <- paste("PC2: ", round(pco$data$ProportionExplained$PC2, 3)*100,"%")
+label.PC2
+label.PC3 <- paste("PC3: ", round(pco$data$ProportionExplained$PC3, 3)*100,"%")
+label.PC3
+
+#Join with sample data
+pco$data$Vectors <- pco$data$Vectors %>% 
+  rename(., "sample_name" = "SampleID" )
+
+pcscores <- left_join(pco$data$Vectors, samp.c)
+
+
+#format loading scores
+loadings <- as.data.frame(pco$data$Species)
+loadings$ASV <- loadings$FeatureID
+
+#join on OTU, adding taxa info
+loadings <- left_join(loadings, tax.c, by="ASV")
+
+#export pcscores
+file = paste(deicode_directory,"scores/pcscores_",marker,"_oBiom_r_env_Dada2_Qiime2_",subset,".csv",sep="")
+print(file)
+write.csv(pcscores, file)
+file = paste(deicode_directory,"scores/loadings_",marker,"_oBiom_r_env_Dada2_Qiime2_",subset,".csv",sep="")
+print(file)
+write.csv(loadings, file)
+pcscores[1:5, 1:9]  #long because of sample data
+head(loadings)
+
+
+
+# Plot RPCA ---------------------------------------------------------------
+
+
+
+cols6 <- c("navyblue", "goldenrod3", "darkmagenta", "firebrick", "firebrick2", "darkolivegreen4", "violetred3")
+
+pcscores %>% mutate(depth_bin = case_when(depth >= 0 & depth <= 20 ~ "0-20"), 
+                        depth_bin = case_when(depth == 60 ~ "60", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 100 ~ "100", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 150 ~ "150", T ~ depth_bin), 
+                        depth_bin = case_when(depth >= 200 & depth <= 700 ~ "200-700", T ~ depth_bin),
+                        depth_bin = case_when(sample_source == "CN24F 150m exp" ~ "150 - benchtop experiment", T ~ depth_bin),
+                        depth_bin = fct_relevel(depth_bin, "0-20", "60", "100", "150", "150 - benchtop experiment", "200-700"),
+                        source_depth_bin = paste(sample_source, depth_bin, sep = " - "),
+                        source_depth_bin = reorder(source_depth_bin, depth)) %>%  
+  ggplot(aes(PC1,PC2, fill=depth_bin))+
+  geom_line(aes(group = original_name, color = depth_bin), linetype = 2, alpha = 0.7) +
+  geom_point(size=4, alpha=0.8, aes(shape = sequencer, color = depth_bin)) + 
+  scale_shape_manual(values = c(21, 1)) +
+    scale_fill_manual(values = cols6) +
+    scale_color_manual(values = cols6, guide="none") +
+  labs(x=label.PC1 , 
+       y=label.PC2, 
+       fill = "Depth Bin (m)",
+       shape = "Sequencer",
+       subtitle = "Comparison between sequencers\nLines connect sample replicates",
+       title = "RPCA - rarefied data, all reads" )+ 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        legend.text = element_text(size = 12, colour = "black"),
+        legend.title = element_text(face = "bold", size=12),
+        legend.key = element_rect(fill = FALSE, colour = FALSE),
+        legend.key.size = unit(0.1,"line"),
+        plot.title = element_text(size = 22),
+        plot.subtitle = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 15),
+  )+ guides(fill = guide_legend(override.aes = list(size=5, shape=21)),
+            shape = guide_legend(override.aes = list(size = 5, shape = c(19, 1))))
+
+
+filename = paste(fig2_directory, 'Figure2b_RPCA_by_depth_bin_',marker,"_",subset,'.png', sep='')
+print('Plot of PC1PC2 colored by Year:')
+filename
+ggsave(filename,height = 9, width =10, units = 'in')
+
+
+
+```
+
+
+
+
+## ## Figure 2 C - all samples, rarefied data, ASVs with 1 read in a sample removed
+
+### create Phyloseq object of all  samples
+```{r}
+
+  
+  subset = c("Rarefied_data_more_than_1_read")
+  Sys.setenv(subset = subset)
+  
+#   metadata_updated <- samp.c %>% mutate(depth_bin = case_when(depth >= 0 & depth <= 20 ~ "0-20"), 
+#                         depth_bin = case_when(depth == 60 ~ "60", T ~ depth_bin), 
+#                         depth_bin = case_when(depth == 100 ~ "100", T ~ depth_bin), 
+#                         depth_bin = case_when(depth == 150 ~ "150", T ~ depth_bin), 
+#                         depth_bin = case_when(depth >= 200 & depth <= 700 ~ "200-700", T ~ depth_bin),
+#                         depth_bin = case_when(sample_source == "CN24F 150m exp" ~ "150 - benchtop experiment", T ~ depth_bin),
+#                         depth_bin = fct_relevel(depth_bin, "0-20", "60", "100", "150", "150 - benchtop experiment", "200-700"))
+#   
+# 
+#   
+# species_label <- tax.c %>% column_to_rownames(var = "ASV")
+#   
+#   rownames(metadata_updated) <- NULL
+#   metadata_updated <- column_to_rownames(metadata_updated,"sample_name")
+#   
+#   more_than_1 <- as.matrix(read_csv(paste0(data_directory, proj_prefix, "_", marker, "_asv_filtered.csv")) %>% 
+#     pivot_longer( -ASV, names_to ='sample_name',values_to = 'reads' ) %>%
+#     filter(!reads <= 5) %>%
+#     pivot_wider(names_from = "sample_name", values_from = "reads", values_fill = 0) %>%
+#     column_to_rownames(var = "ASV"))
+#   
+#   # , row.names = 1,check.names = FALSE
+#   
+#   phylo <- merge_phyloseq(otu_table(more_than_1,taxa_are_rows = TRUE),
+#                           tax_table(as.matrix(species_label)),
+#                           sample_data(metadata_updated))
+  
+  
+  # phylo <- merge_phyloseq(otu_table(as.matrix(read.csv(paste0(data_directory, proj_prefix, "_", marker, "_asv_filtered.csv"), row.names = 1,check.names = FALSE)),taxa_are_rows = TRUE),
+  #                         tax_table(as.matrix(species_label)),
+  #                         sample_data(metadata_updated))
+  
+  # phylo
+  # 
+  #   sample_data(phylo)
+  # 
+  # phylo_obj <- phylo
+  # 
+  # phylo_obj_env <- prune_samples(sample_data(phylo)$sample_type %in% c("environmental"), phylo) 
+  # 
+  # 
+  # 
+  # 
+  # 
+  # sample_data(phylo_obj)
+  # sample_data(phylo_obj_env)
+  # # sample_data(phylo_obj_cb)
+  # 
+  # # Create Tables -----------------------------------------------------------
+  # 
+  # #create vegan tables
+  # vegan_matrix_env=vegan_otu(phylo_obj_env)
+  # otu_tab_env=otu_table(phylo_obj_env)
+  # tax_tab_env= tax_table(phylo_obj_env)
+  # samp_dat_env <- sample_data(phylo_obj_env)
+  # 
+  # # Rarefy ------------------------------------------------------------------
+  # #print(sample_sums(phylo_obj_env))
+  # print(min(sample_sums(phylo_obj_env)))
+  # print(max(sample_sums(phylo_obj_env)))
+  # print(mean(sample_sums(phylo_obj_env)))
+  # print(phylo_obj_env)
+  # # Remove samples with <500 reads (like DEICODE)
+  # oBiom_r_env = prune_samples(sample_sums(phylo_obj_env)>=5000, phylo_obj_env)
+  # #set random seed for reproducibility later
+  # print(min(sample_sums(oBiom_r_env)))
+  # oBiom_r_env = rarefy_even_depth(oBiom_r_env, sample.size = min(sample_sums(oBiom_r_env)), rngseed = 678, replace = FALSE, trimOTUs = TRUE, verbose = TRUE)
+  # print(oBiom_r_env)
+  # assign(paste0("oBiom_r_env_",marker),oBiom_r_env)
+  
+  ##########
+  ##########
+  ##########
+  ##########
+  ### Take the rarefied data from earlier and now remove singleton ASVs from samples
+  rotu_tab_env=otu_table(oBiom_r_env)
+  
+  as.data.frame(rotu_tab_env)
+
+as.matrix(as.data.frame(rotu_tab_env) %>% 
+            rownames_to_column(var = "ASV") %>%
+    pivot_longer( -ASV, names_to ='sample_name',values_to = 'reads' ) %>%
+    filter(!reads <= 1) %>%
+    pivot_wider(names_from = "sample_name", values_from = "reads", values_fill = 0) %>%
+    column_to_rownames(var = "ASV"))
+
+phylo2 <- merge_phyloseq(otu_table(as.matrix(as.data.frame(rotu_tab_env) %>% 
+            rownames_to_column(var = "ASV") %>%
+    pivot_longer( -ASV, names_to ='sample_name',values_to = 'reads' ) %>%
+    filter(reads > 1) %>%
+    pivot_wider(names_from = "sample_name", values_from = "reads", values_fill = 0) %>%
+    column_to_rownames(var = "ASV")),taxa_are_rows = TRUE),
+                          tax_table(as.matrix(species_label)),
+                          sample_data(metadata_updated))
+phylo2
+oBiom_r_env
+
+
+
+oBiom_r_env <- phylo2
+
+
+  
+  #create matrixes
+  rvegan_matrix_env=vegan_otu(oBiom_r_env)
+  rotu_tab_env=otu_table(oBiom_r_env)
+  rtax_tab_env= tax_table(oBiom_r_env)
+  rsamp_dat_env <- rownames_to_column(as.data.frame(as.matrix(sample_data(oBiom_r_env))), var = "sample_name") #sample_data(oBiom_r_env)
+  
+  #save rarefied data
+  # #save to csv file
+  file = paste(rarefaction_data,marker,'_env_Non-Rarefied_asv_table_',subset,'.csv', sep="")
+  write.csv(otu_tab_env, file)
+  file = paste(rarefaction_data,marker,'_env_Non-Rarefied_taxa_table_',subset,'.csv', sep="")
+  write.csv(tax_tab_env, file)
+  # file = paste(rarefaction_data,marker,'_env_Non-Rarefied_meta_table_',subset,'.csv', sep="")
+  # write.csv(samp_dat_env, file)
+
+  file = paste(rarefaction_data,marker,'_env_Rarefied_asv_table_',subset,'.csv', sep="")
+  write.csv(rotu_tab_env, file)
+  file = paste(rarefaction_data,marker,'_env_Rarefied_taxa_table_',subset,'.csv', sep="")
+  write.csv(rtax_tab_env, file)
+  file = paste(rarefaction_data,marker,'_env_Rarefied_meta_table_',subset,'.csv', sep="")
+  write.csv(rsamp_dat_env, file)
+  
+  
+  ### DEICODE PCA 
+  # rarefied
+  phylo_obj_env_asv_table <- as.data.frame(otu_table(oBiom_r_env))
+  phylo_obj_env_asv_table <- rownames_to_column(phylo_obj_env_asv_table,"#OTUID")
+  write.table(phylo_obj_env_asv_table,paste0(deicode_directory,"/oBiom_r_env_",marker,"_asv_table_for_biom_",subset,".txt"),sep = "\t",row.names = FALSE,quote = FALSE)
+ 
+  phylo_obj_env_tax_table <- as.data.frame(as(tax_table(oBiom_r_env),"matrix"))
+  phylo_obj_env_tax_table <- rownames_to_column(phylo_obj_env_tax_table,"#OTUID")
+  write.table(phylo_obj_env_tax_table,paste0(deicode_directory,"/oBiom_r_env_",marker,"_tax_table_for_biom_",subset,".txt"),sep = "\t",row.names = FALSE,quote = FALSE)
+  
+  phylo_obj_env_metadata <- as.data.frame(as.matrix(sample_data(oBiom_r_env)))
+  phylo_obj_env_metadata <- rownames_to_column(phylo_obj_env_metadata,"#SampleID")
+  write.table(phylo_obj_env_metadata,paste0(deicode_directory,"/oBiom_r_env_",marker,"_metadata_for_biom_",subset,".txt"),sep = "\t",row.names = FALSE,quote = FALSE)
+  
+
+  
+```
+
+### DEICODE
+#### deicode PCA use a loop to jump into each of the folders for the three markers for all samples
+```{bash engine.opts='-l'}
+# move into the directory where you are going to run the DEICODE script
+cd ../data/DEICODE
+pwd
+
+
+# Activate the conda qiime2 enviroment - check version
+conda activate qiime2-2022.11
+
+for folder in 18S  #for folder in 12S 18S COI
+do
+  #for data in phylo_obj phylo_obj_env phylo_obj_cb
+  for data in oBiom_r_env
+
+  do
+  cd $folder
+  #!/usr/bin/env bash
+
+  # This bash script can be run with bash deicode_template_072820.sh
+  # All of the input files (asv_table_for_deicode.txt, tax_table_for_deicode.txt, and metadata_for_deicode.txt) must be in the   same directory as this script.
+
+  ### Description ###
+  #
+  # You will need qiime2 and DEICODE installed on your machine in order for it to work.
+  # You will have four outputs: 1) distance.qza, 2) ordination.qza, 3) biplot.qza, and 4_ qurro_plot_deicoderank.qzv
+  # Of these outputs, the most import one is the "ordination.qza" file - this is what you will use in R
+  # biplot.qza can be visualized at view.qiime2.org, and is an interactive way to view your PCA.
+  # qurro_plot_deicoderank.qzv will show you the loadings of your taxa on the different PCs.
+
+  #Make biom file
+    biom convert -i ./${data}_${folder}_asv_table_for_biom_${subset}.txt -o table.from_txt_json_${data}_${subset}.biom --table-type="OTU table" --to-json
+  #add metadata files to biom file - change the merged_tax_table_for_biomm.txt and _merged_for_biom.txt files
+   biom add-metadata -i table.from_txt_json_${data}_${subset}.biom -o table.w_md_${data}_${subset}.biom --observation-metadata-fp ${data}_${folder}_tax_table_for_biom_${subset}.txt --sample-metadata-fp ${data}_${folder}_metadata_for_biom_${subset}.txt
+
+  #import into Qiime2 - Change output file
+    qiime tools import \
+     --input-path table.w_md_${data}_${subset}.biom \
+     --output-path ${data}_${folder}_master_${subset}.biom.qza \
+     --type FeatureTable[Frequency]
+
+  #run DEICODE - change input table
+    qiime deicode rpca \
+      --i-table ${data}_${folder}_master_${subset}.biom.qza \
+      --p-n-components 3 \
+      --p-min-feature-count 10 \
+      --p-min-sample-count 5000 \
+      --o-biplot ordination_${data}_${subset}.qza \
+      --o-distance-matrix distance_${data}_${subset}.qza
+
+  ## Create biplot - change metadata files
+    qiime emperor biplot \
+      --i-biplot ordination_${data}_${subset}.qza \
+      --m-sample-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --m-feature-metadata-file ${data}_${folder}_tax_table_for_biom_${subset}.txt \
+      --o-visualization biplot_${data}_${subset}.qzv \
+      --p-number-of-features 8
+
+  # Create Qurro Visualization - change metadata files
+    qiime qurro loading-plot \
+      --i-ranks ordination_${data}_${subset}.qza \
+      --i-table ${data}_${folder}_master_${subset}.biom.qza \
+      --m-sample-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --m-feature-metadata-file ${data}_${folder}_tax_table_for_biom_${subset}.txt \
+      --o-visualization qurro_plot_deicoderank_${data}_${subset}.qzv
+
+   # Run a permanova | permdisp | or anosim test between whatever metadata column you choose (argument --m-metadata-column [column of choosing])
+     qiime diversity beta-group-significance \
+      --i-distance-matrix distance_${data}_${subset}.qza \
+      --m-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --m-metadata-column sequencer \
+      --p-method anosim \
+      --o-visualization sequencer_significance_anosim_${data}_${subset}.qzv
+
+    # Alpha diversity test
+    #Shannon
+     qiime diversity alpha \
+       --i-table ${data}_${folder}_master_${subset}.biom.qza \
+       --p-metric shannon \
+       --o-alpha-diversity ${data}_${folder}_shannon_alpha_${subset}.qza
+
+      qiime diversity alpha-group-significance \
+      --i-alpha-diversity ${data}_${folder}_shannon_alpha_${subset}.qza \
+      --m-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --o-visualization ${data}_${folder}_shannon_alpha_${subset}.qzv
+      
+      #Chao1
+      qiime diversity alpha \
+       --i-table ${data}_${folder}_master_${subset}.biom.qza \
+       --p-metric chao1 \
+       --o-alpha-diversity ${data}_${folder}_chao1_alpha_${subset}.qza
+
+      qiime diversity alpha-group-significance \
+      --i-alpha-diversity ${data}_${folder}_chao1_alpha_${subset}.qza \
+      --m-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --o-visualization ${data}_${folder}_chao1_alpha_${subset}.qzv
+      
+      #Observed OTUs
+      qiime diversity alpha \
+       --i-table ${data}_${folder}_master_${subset}.biom.qza \
+       --p-metric observed_features \
+       --o-alpha-diversity ${data}_${folder}_observed_otus_alpha_${subset}.qza
+
+      qiime diversity alpha-group-significance \
+      --i-alpha-diversity ${data}_${folder}_observed_otus_alpha_${subset}.qza \
+      --m-metadata-file ${data}_${folder}_metadata_for_biom_${subset}.txt \
+      --o-visualization ${data}_${folder}_observed_otus_alpha_${subset}.qzv
+   done
+
+  cd ../
+done
+
+```
+
+
+
+
+#### RPCA of all samples, rarefied data, ASVs with 1 read in a sample removed
+```{r}
+
+
+#Import Qiime2 Results
+file = paste(deicode_directory,"ordination_oBiom_r_env_",subset,".qza",sep="")
+print(file)
+pco<-read_qza(file)
+pco$uuid
+#look at data
+head(pco$data$ProportionExplained)
+pco$data$Vectors[1:5, 1:4]
+
+#create proportion explained labels
+label.PC1 <- paste("PC1: ", round(pco$data$ProportionExplained$PC1, 3)*100,"%")
+label.PC1
+label.PC2 <- paste("PC2: ", round(pco$data$ProportionExplained$PC2, 3)*100,"%")
+label.PC2
+label.PC3 <- paste("PC3: ", round(pco$data$ProportionExplained$PC3, 3)*100,"%")
+label.PC3
+
+#Join with sample data
+pco$data$Vectors <- pco$data$Vectors %>% 
+  rename(., "sample_name" = "SampleID" )
+
+pcscores <- left_join(pco$data$Vectors, samp.c)
+
+
+#format loading scores
+loadings <- as.data.frame(pco$data$Species)
+loadings$ASV <- loadings$FeatureID
+
+#join on OTU, adding taxa info
+loadings <- left_join(loadings, tax.c, by="ASV")
+
+#export pcscores
+file = paste(deicode_directory,"scores/pcscores_",marker,"_oBiom_r_env_Dada2_Qiime2_",subset,".csv",sep="")
+print(file)
+write.csv(pcscores, file)
+file = paste(deicode_directory,"scores/loadings_",marker,"_oBiom_r_env_Dada2_Qiime2_",subset,".csv",sep="")
+print(file)
+write.csv(loadings, file)
+pcscores[1:5, 1:9]  #long because of sample data
+head(loadings)
+
+
+# Plot RPCA ---------------------------------------------------------------
+
+
+
+cols6 <- c("navyblue", "goldenrod3", "darkmagenta", "firebrick", "firebrick2", "darkolivegreen4", "violetred3")
+
+pcscores %>% mutate(depth_bin = case_when(depth >= 0 & depth <= 20 ~ "0-20"), 
+                        depth_bin = case_when(depth == 60 ~ "60", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 100 ~ "100", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 150 ~ "150", T ~ depth_bin), 
+                        depth_bin = case_when(depth >= 200 & depth <= 700 ~ "200-700", T ~ depth_bin),
+                        depth_bin = case_when(sample_source == "CN24F 150m exp" ~ "150 - benchtop experiment", T ~ depth_bin),
+                        depth_bin = fct_relevel(depth_bin, "0-20", "60", "100", "150", "150 - benchtop experiment", "200-700"),
+                        source_depth_bin = paste(sample_source, depth_bin, sep = " - "),
+                        source_depth_bin = reorder(source_depth_bin, depth)) %>%  #merge( aggregate(cbind(mean.x=PC1, mean.y=PC2)~sequencer,pcscores,mean),by="sequencer") %>%
+  ggplot(aes(PC1,PC2, fill=depth_bin))+
+  geom_line(aes(group = original_name, color = depth_bin), linetype = 2, alpha = 0.7) +
+  geom_point(size=4, alpha=0.8, aes(shape = sequencer, color = depth_bin)) + 
+  # stat_ellipse(aes(group = depth_bin, color = depth_bin)) +
+  # geom_point(aes(x=mean.x,y=mean.y),size=6)+
+  # geom_segment(aes( x=mean.x, y=mean.y, xend=PC1, yend=PC2)) +
+  # geom_segment(aes(x=mean.x, y=mean.y, xend=PC1, yend=PC2)) +
+  scale_shape_manual(values = c(21, 1)) +
+    scale_fill_manual(values = cols6) +
+    scale_color_manual(values = cols6, guide="none") +
+  # scale_color_tableau(palette = "Tableau 20") +
+  # scale_color_viridis(option = "G", direction = 1, discrete = T, begin=.1, end = .9) +
+  labs(x=label.PC1 , 
+       y=label.PC2, 
+       fill = "Depth Bin (m)",
+       shape = "Sequencer",
+       subtitle = "Comparison between sequencers\nLines connect sample replicates",
+       title = "RPCA - rarefied data, ASVs with 1 read in a sample removed")+ 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        legend.text = element_text(size = 12, colour = "black"),
+        legend.title = element_text(face = "bold", size=12),
+        legend.key = element_rect(fill = FALSE, colour = FALSE),
+        legend.key.size = unit(0.1,"line"),
+        plot.title = element_text(size = 22),
+        plot.subtitle = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 15),
+  )+ guides(fill = guide_legend(override.aes = list(size=5, shape=21)),
+            shape = guide_legend(override.aes = list(size = 5, shape = c(19, 1))))
+
+
+
+filename = paste(fig2_directory, 'Figure2c_RPCA_by_depth_bin_',marker,"_",subset,'.png', sep='')
+print('Plot of PC1PC2 colored by Year:')
+filename
+ggsave(filename,height = 9, width =10, units = 'in')
+
+
+
+```
+
+
+
