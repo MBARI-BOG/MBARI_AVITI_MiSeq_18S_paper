@@ -1,0 +1,180 @@
+---
+title: "Figure1_top20_taxa"
+author: "Jacoby Baker"
+date: "2026-03-23"
+output: html_document
+---
+
+# Set up directories and variables
+```{r}
+# setwd('scripts/')
+proj_prefix <- "AVITI_MiSeq_comparison"
+proj_name <- "AVITI VS MiSeq Comparison"
+
+data_directory <- paste0('../data/filtered_seq_data/')
+
+getwd()
+barchart_directory <- paste0("../figures/bar_charts/")
+
+marker = "18S"
+```
+
+
+
+# Load libraries
+```{r}
+
+#load libraries
+library(readr) #read csv files
+
+library(dplyr) # for data manipulation
+library(ggplot2) # for plotting data
+library(ggthemes) # for plotting data
+library(magrittr) # for piping commands
+# library(RColorBrewer) # colors for plotting
+# library("viridis") # for color fill 
+
+
+library(tidyverse) # for data manipulation
+# library(phyloseq)
+
+# library(taxa)
+# library(metacoder)
+# library(ggpubr) # for ggarrange
+# library(reshape2) # for presence/absence fig
+
+
+# library(ggnewscale) # multiple fill color scales
+
+
+# library(ggh4x) # for facet nested wrap
+```
+
+
+
+
+# Load in Data
+```{r}
+
+#ASV table
+otu.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_asv_filtered.csv"))
+otu.c
+
+#taxa table
+tax.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_taxa_filtered.csv"))
+tax.c
+
+#metadata table
+samp.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_meta_filtered.csv")) %>%
+  mutate(sample_source = fct_relevel(sample_source,  "CN23 MARS" , "MBTS 17024", "MBTS 20524", "MBTS 22624", "MBTS 25424", "CN24F 150m exp"))
+samp.c
+
+
+
+#OTU table long format with percent total reads
+potu.c <- otu.c %>%
+  tidyr::pivot_longer( -ASV, names_to ='sample_name',values_to = 'reads' ) %>%
+  ungroup() %>%
+  group_by(sample_name) %>%
+  mutate(per_tot = reads / sum(reads) *100) %>% #proportions(reads)*100
+  arrange(-reads)
+head(potu.c)
+
+
+```
+
+
+
+## set lowest taxonomic annotation level for ASVs
+```{r}
+
+  species_label <- tax.c %>%
+  # assign  algae
+  mutate(Phylum = case_when(Class == "Raphidophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Phaeophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Pelagophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Dictyochophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Chrysophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Synurophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Bolidophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Eustigmatophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  # assign oomycotes
+  mutate(Phylum = case_when(Class == "Oomycota" ~ "Oomycota", T ~ Phylum))  %>%
+  mutate(Phylum = case_when(Class == "Oomycetes" ~ "Oomycota", T ~ Phylum))%>%
+  # assign microeuk
+  mutate(Phylum = case_when(Class == "Bigyra" ~ "Bigyra", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Choanoflagellata" ~ "Choanoflagellata", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Cryptophyceae" ~ "Cryptista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Order == "Telonemida" ~ "Cryptista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Haptophyta" ~ "Haptista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Centroplasthelida" ~ "Haptista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Ichthyosporea" ~ "Choanozoa", T ~ Phylum))  %>% 
+  
+  mutate(Class = case_when(Phylum == "Imbricatea" ~ "Imbricatea", T ~ Class)) %>%
+  mutate(Phylum = case_when(Class == "Imbricatea" ~ "Cercozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Polycystinea" ~ "Retaria", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Acantharea" ~ "Retaria", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Breviatea" ~ "Sulcozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Aphelidea" ~ "Aphelida", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Filasterea" ~ "Choanozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Phylum %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Phylum)) %>% 
+  mutate(Class = case_when(Class %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Class)) %>% 
+  mutate(Order = case_when(Order %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Order)) %>% 
+  mutate(Family = case_when(Family %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Family)) %>% 
+  mutate(Genus = case_when(Genus %in% c("unknown", "unassigned", "no_hit", "g_") ~ "unknown", T ~ Genus)) %>% 
+  mutate(Species = case_when(Species %in% c("unknown", "unassigned", "no_hit", "s_") ~ "unknown", T ~ Species))
+
+  species_label
+
+
+```
+
+
+```{r}
+
+inner_join(samp.c, potu.c, by = c("sample_name")) %>% 
+  left_join(tax.c) %>%
+  # group_by(Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  
+  filter(Phylum %in% c("unknown", "no_hit", "unassigned")) %>% 
+  arrange(-per_tot)
+
+```
+
+
+
+# Compile data - 
+```{r}
+
+# environmental data
+env_data <- inner_join(samp.c, potu.c, by = c("sample_name")) %>% 
+  left_join(species_label)
+
+env_data 
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
