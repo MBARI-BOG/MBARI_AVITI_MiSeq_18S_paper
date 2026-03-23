@@ -475,8 +475,14 @@ pcscores %>% mutate(depth_bin = case_when(depth >= 0 & depth <= 20 ~ "0-20"),
   )+ guides(fill = guide_legend(override.aes = list(size=5, shape=c(21))),
             shape = guide_legend(override.aes = list(size = 5, shape = c(19, 1))))
 
-
+# save as .png
 filename = paste(fig2_directory, 'Figure2a_RPCA_by_depth_bin_inverse_',marker,"_",subset,'.png', sep='')
+print('Plot of PC1PC2 colored by Year:')
+filename
+ggsave(filename,height = 9, width =10, units = 'in')
+
+# save as .svg
+filename = paste(fig2_directory, 'Figure2a_RPCA_by_depth_bin_inverse_',marker,"_",subset,'.svg', sep='')
 print('Plot of PC1PC2 colored by Year:')
 filename
 ggsave(filename,height = 9, width =10, units = 'in')
@@ -802,10 +808,18 @@ pcscores %>% mutate(depth_bin = case_when(depth >= 0 & depth <= 20 ~ "0-20"),
             shape = guide_legend(override.aes = list(size = 5, shape = c(19, 1))))
 
 
+# save as .png
 filename = paste(fig2_directory, 'Figure2b_RPCA_by_depth_bin_',marker,"_",subset,'.png', sep='')
 print('Plot of PC1PC2 colored by Year:')
 filename
 ggsave(filename,height = 9, width =10, units = 'in')
+
+# save as .svg
+filename = paste(fig2_directory, 'Figure2b_RPCA_by_depth_bin_',marker,"_",subset,'.svg', sep='')
+print('Plot of PC1PC2 colored by Year:')
+filename
+ggsave(filename,height = 9, width =10, units = 'in')
+
 
 
 
@@ -1178,12 +1192,17 @@ pcscores %>% mutate(depth_bin = case_when(depth >= 0 & depth <= 20 ~ "0-20"),
             shape = guide_legend(override.aes = list(size = 5, shape = c(19, 1))))
 
 
-
+# save as .png
 filename = paste(fig2_directory, 'Figure2c_RPCA_by_depth_bin_',marker,"_",subset,'.png', sep='')
 print('Plot of PC1PC2 colored by Year:')
 filename
 ggsave(filename,height = 9, width =10, units = 'in')
 
+# save as .svg
+filename = paste(fig2_directory, 'Figure2c_RPCA_by_depth_bin_',marker,"_",subset,'.svg', sep='')
+print('Plot of PC1PC2 colored by Year:')
+filename
+ggsave(filename,height = 9, width =10, units = 'in')
 
 
 ```
