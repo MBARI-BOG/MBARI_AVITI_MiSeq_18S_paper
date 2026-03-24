@@ -1,0 +1,645 @@
+---
+title: "Figure3_sample_statistics_and_alpha_diversity"
+author: "Jacoby Baker"
+date: "2026-03-23"
+output: html_document
+---
+
+
+# Set up directories and variables
+```{r}
+# setwd('scripts/')
+proj_prefix <- "AVITI_MiSeq_comparison"
+proj_name <- "AVITI VS MiSeq Comparison"
+
+data_directory <- paste0('../data/filtered_seq_data/')
+rarefaction_data <- paste0('../data/rarefaction_data/')
+diversity_directory <- paste0("../figures/diversity/")
+# fig_directory <- paste0("../figures/")
+
+getwd()
+fig3_directory <- paste0("../figures/Fig3/")
+
+marker = "18S"
+```
+
+
+
+# Load libraries
+```{r}
+
+#load libraries
+library(readr) #read csv files
+# library(vegan3d)
+
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(magrittr)
+library(RColorBrewer) #colors for plotting
+# library("viridis") # for color fill 
+
+
+library(tidyverse)
+library(phyloseq)
+
+# library(taxa)
+# library(metacoder)
+# library(ggpubr) # for ggarrange
+# library(reshape2) # for presence/absence fig
+
+
+library(ggnewscale) # multiple fill color scales
+
+library(cowplot) # for getting legend
+# library(ggh4x) # for facet nested wrap
+
+# library(ggbreak)
+
+```
+
+
+# # Non rarefied data
+
+## Load in Data
+```{r}
+
+#ASV table
+otu.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_asv_filtered.csv"))
+otu.c
+
+#taxa table
+tax.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_taxa_filtered.csv"))
+tax.c
+
+#metadata table
+samp.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_meta_filtered.csv")) %>%
+  mutate(sample_source = fct_relevel(sample_source,  "CN23 MARS" , "MBTS 17024", "MBTS 20524", "MBTS 22624", "MBTS 25424", "CN24F 150m exp")) %>%
+  mutate(short_name = "") %>%
+  mutate(short_name = case_when(grepl("eDNA", sample_name) ~ substr(sample_name,1,nchar(sample_name)-9), T ~ short_name)) %>%
+  mutate(short_name = case_when(grepl("CN24F150", sample_name) ~ substr(sample_name,14,nchar(sample_name)-3), T ~ short_name))
+  
+samp.c
+
+seq.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_seq_filtered.csv"))
+seq.c
+
+#OTU table long format with percent total reads
+potu.c <- otu.c %>%
+  tidyr::pivot_longer( -ASV, names_to ='sample_name',values_to = 'reads' ) %>%
+  ungroup() %>%
+  group_by(sample_name) %>%
+  mutate(per_tot = reads / sum(reads) *100) %>% #proportions(reads)*100
+  arrange(-reads)
+head(potu.c)
+
+
+```
+
+
+
+## set lowest taxonomic annotation level for ASVs
+```{r}
+
+  species_label <- tax.c  %>%
+  # assign  algae
+  mutate(Phylum = case_when(Class == "Raphidophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Phaeophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Pelagophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Dictyochophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Chrysophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Synurophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Bolidophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Eustigmatophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  # assign oomycotes
+  mutate(Phylum = case_when(Class == "Oomycota" ~ "Oomycota", T ~ Phylum))  %>%
+  mutate(Phylum = case_when(Class == "Oomycetes" ~ "Oomycota", T ~ Phylum))%>%
+  # assign microeuk
+  mutate(Phylum = case_when(Class == "Bigyra" ~ "Bigyra", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Choanoflagellata" ~ "Choanoflagellata", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Cryptophyceae" ~ "Cryptista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Order == "Telonemida" ~ "Cryptista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Haptophyta" ~ "Haptista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Centroplasthelida" ~ "Haptista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Ichthyosporea" ~ "Choanozoa", T ~ Phylum))  %>% 
+  
+  mutate(Class = case_when(Phylum == "Imbricatea" ~ "Imbricatea", T ~ Class)) %>%
+  mutate(Phylum = case_when(Class == "Imbricatea" ~ "Cercozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Polycystinea" ~ "Retaria", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Acantharea" ~ "Retaria", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Breviatea" ~ "Sulcozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Aphelidea" ~ "Aphelida", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Filasterea" ~ "Choanozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Phylum %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Phylum)) %>% 
+  mutate(Class = case_when(Class %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Class)) %>% 
+  mutate(Order = case_when(Order %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Order)) %>% 
+  mutate(Family = case_when(Family %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Family)) %>% 
+  mutate(Genus = case_when(Genus %in% c("unknown", "unassigned", "no_hit", "g_") ~ "unknown", T ~ Genus)) %>% 
+  mutate(Species = case_when(Species %in% c("unknown", "unassigned", "no_hit", "s_") ~ "unknown", T ~ Species))
+
+
+  species_label
+
+
+```
+
+
+
+
+## Compile data - 
+```{r}
+
+# environmental data
+env_data <- inner_join(samp.c, potu.c, by = c("sample_name")) %>% 
+  left_join(species_label)
+
+env_data 
+
+
+```
+
+
+
+```{r}
+
+
+# all_data <- env_data %>% 
+#   select(sample_name, PlateID, SAMPLING_station, original_name, sequencer, depth_round, source_depth, ASV, reads, per_tot, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+#   filter(reads > 0)
+# 
+# all_data
+
+
+
+```
+
+
+## FIGURE 3 A - number of reads per sampler/sequencer - non rarefied data
+### Number of reads per sample
+```{r}
+
+cols <- c("deepskyblue4", "darkolivegreen4")
+pd <- position_dodge(0.4) # dodge position for aligning geom_line with geom_jitter
+cols6 <- c("navyblue", "goldenrod3", "darkmagenta", "firebrick", "firebrick2", "darkolivegreen4", "violetred3")
+
+
+
+# number of reads per sample - samples connected
+reads_data <- env_data %>% select(sample_name, SAMPLING_station, depth, original_name,sample_source, ASV, reads, sequencer, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  mutate(depth_bin = case_when(depth >= 0 & depth <= 20 ~ "0-20"), 
+                        depth_bin = case_when(depth == 60 ~ "60", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 100 ~ "100", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 150 ~ "150", T ~ depth_bin), 
+                        depth_bin = case_when(depth >= 200 & depth <= 700 ~ "200-700", T ~ depth_bin),
+                        depth_bin = case_when(sample_source == "CN24F 150m exp" ~ "150 - benchtop experiment", T ~ depth_bin),
+                        depth_bin = fct_relevel(depth_bin, "0-20", "60", "100", "150", "150 - benchtop experiment", "200-700"),
+                        source_depth_bin = paste(sample_source, depth_bin, sep = " - "),
+         source_depth_bin = paste(sample_source, depth_bin, sep = " - "),
+         source_depth_bin = reorder(source_depth_bin, depth),
+         SAMPLING_station = case_when(grepl("c1", SAMPLING_station) ~ "C1", T ~ SAMPLING_station),
+         SAMPLING_station = case_when(grepl("MOORING1|Mooring1|MOORING 1", SAMPLING_station) ~ "M1", T ~ SAMPLING_station),
+         SAMPLING_station = case_when(grepl("MOORING2|Mooring2|MOORING 2", SAMPLING_station) ~ "M2", T ~ SAMPLING_station),
+         SAMPLING_station = case_when(grepl("CN24F", sample_name) ~ "Benchtop ESP", T ~ SAMPLING_station),
+         station_depth = paste(SAMPLING_station, depth, sep = " - "), 
+         station_depth = reorder(station_depth, depth),
+         station_depth_bin = paste(SAMPLING_station, depth_bin, sep = " - "),
+         station_depth_bin = reorder(station_depth_bin, depth)) %>%
+  filter(reads > 0) %>%
+  mutate(count = 1) %>%
+  group_by(sample_name) %>%
+  mutate(sample_reads = sum(reads)) %>%
+  ungroup() %>%
+  distinct(sample_name, .keep_all = T) %>%
+  mutate(sequencer = fct_relevel(sequencer, "MiSeq", "AVITI")) 
+
+ fig3a_with_legend <- reads_data %>% ggplot(aes(x=sequencer, y = sample_reads, group = original_name)) +
+  geom_line(position = pd, aes(color = depth_bin), alpha = .5, show.legend = F) +
+  scale_color_manual(values = cols6) +
+  new_scale_color() +
+  geom_violin(aes(group = sequencer), alpha = 0, linewidth = 1) + #color = sequencer, 
+  geom_point(position = pd, aes(fill = depth_bin), shape = 21, size = 3) +
+  scale_fill_manual(values = cols6) +
+  scale_y_log10(breaks = c(50000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000), labels = scales::label_comma()) +
+  labs(
+    subtitle = get_test_label(kruskal_test(sample_reads ~ sequencer, data = reads_data), detailed = TRUE),
+    fill = "Depth Bin (m)",
+    y = "Number of reads",
+    x = "Sequencer",
+    title = "Reads per sample - non rarefied"
+    )+
+    theme_bw() + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        plot.title = element_text(size = 24, face = "bold"), 
+        plot.subtitle = element_text(size = 20), 
+        plot.caption = element_blank(), 
+        legend.text =  element_text(size = 20, colour = "black"), 
+        legend.title =  element_text(face = "bold", size=23), 
+        axis.text = element_text(size = 20),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 24, face = "bold")
+        ) +
+  guides(fill=guide_legend(override.aes = list(size=7)))
+  
+fig3a_with_legend
+
+# remove legend for figure panels
+ fig3a_no_legend <- fig3a_with_legend +
+    theme(
+      legend.position = "none",
+    )
+  fig3a_no_legend
+
+
+filename = paste(fig3_directory, 'Figure3a_scatter_plot_reads_per_sample_non_rarefied_',proj_prefix,'_',marker,'.png', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 10, width =8, units = 'in')
+
+###########  
+ 
+  # pull out legend and plot for figure panels
+  fig3_legend <- get_legend(fig3a_with_legend)
+  fig3_leg <- plot_grid(fig3_legend, rel_heights = c(2, 0.5))
+  fig3_leg
+  
+  filename = paste(fig3_directory, 'Figure3_legend_',proj_prefix,'_',marker,'.png', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 6, width =8, units = 'in')
+
+```
+
+
+
+## FIGURE 3 B - number of ASVs per sampler/sequencer - non rarefied data
+### Number of ASVs per sample
+## Violin plots of unique ASVs and taxa per sequencer
+
+```{r}
+
+pd <- position_dodge(0.4) # dodge position for aligning geom_line with geom_jitter
+cols6 <- c("navyblue", "goldenrod3", "darkmagenta", "firebrick", "firebrick2", "darkolivegreen4", "violetred3")
+
+
+
+
+
+# ASV level
+asv_data <- env_data %>% select(sample_name, SAMPLING_station, depth, original_name,sample_source, ASV, reads, sequencer, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>% mutate(depth_bin = case_when(depth >= 0 & depth <= 20 ~ "0-20"), 
+                        depth_bin = case_when(depth == 60 ~ "60", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 100 ~ "100", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 150 ~ "150", T ~ depth_bin), 
+                        depth_bin = case_when(depth >= 200 & depth <= 700 ~ "200-700", T ~ depth_bin),
+                        depth_bin = case_when(sample_source == "CN24F 150m exp" ~ "150 - benchtop experiment", T ~ depth_bin),
+                        depth_bin = fct_relevel(depth_bin, "0-20", "60", "100", "150", "150 - benchtop experiment", "200-700"),
+                        source_depth_bin = paste(sample_source, depth_bin, sep = " - "),
+                        source_depth_bin = reorder(source_depth_bin, depth),
+         source_depth_bin = paste(sample_source, depth_bin, sep = " - "),
+         source_depth_bin = reorder(source_depth_bin, depth),
+         SAMPLING_station = case_when(grepl("c1", SAMPLING_station) ~ "C1", T ~ SAMPLING_station),
+         SAMPLING_station = case_when(grepl("MOORING1|Mooring1|MOORING 1", SAMPLING_station) ~ "M1", T ~ SAMPLING_station),
+         SAMPLING_station = case_when(grepl("MOORING2|Mooring2|MOORING 2", SAMPLING_station) ~ "M2", T ~ SAMPLING_station),
+         SAMPLING_station = case_when(grepl("CN24F", sample_name) ~ "Benchtop ESP", T ~ SAMPLING_station),
+         station_depth = paste(SAMPLING_station, depth, sep = " - "), 
+         station_depth = reorder(station_depth, depth),
+         station_depth_bin = paste(SAMPLING_station, depth_bin, sep = " - "),
+         station_depth_bin = reorder(station_depth_bin, depth)) %>%
+  filter(reads > 0) %>%
+  mutate(count = 1) %>%
+  group_by(sample_name) %>%
+  mutate(ASV_count = sum(count)) %>%
+  ungroup() %>%
+  distinct(sample_name, .keep_all = T) %>%
+  mutate(sequencer = fct_relevel(sequencer, "MiSeq", "AVITI")) 
+  
+  asv_data %>% ggplot(aes(x=sequencer, y = ASV_count, group = original_name)) +
+  geom_line(position = pd, aes(color = depth_bin), alpha = .5, show.legend = F) +
+  scale_color_manual(values = cols6) +
+  new_scale_color() +
+  geom_violin(aes(group = sequencer), alpha = 0, linewidth = 1) + 
+  geom_point(position = pd, aes(fill = depth_bin), shape = 21, size = 3) +
+  scale_fill_manual(values = cols6)  +
+  labs(
+    subtitle = get_test_label(kruskal_test(ASV_count ~ sequencer, data = asv_data), detailed = TRUE),
+    color = "Depth Bin (m)",
+    y = "Number of ASVs",
+    x = "Sequencer",
+    fill = "Depth Bin (m)",
+    title = "ASVs per sample - non rarefied"
+    )+
+    theme_bw() + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        plot.title = element_text(size = 24, face = "bold"), 
+        plot.subtitle = element_text(size = 20), 
+        plot.caption = element_blank(), 
+        legend.text =  element_text(size = 20, colour = "black"),
+        legend.title =  element_text(face = "bold", size=23),
+        legend.position = "none",
+        axis.text = element_text(size = 20),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 24, face = "bold")
+        ) +
+  guides(fill=guide_legend(override.aes = list(size=7)))
+
+
+filename = paste(fig3_directory, 'Figure3b_scatter_plot_ASVs_per_sample_non_rarefied_',proj_prefix,'_',marker,'.png', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 10, width =8, units = 'in')
+  
+
+```
+
+
+# #########
+# # Rarefied data
+
+
+## Load in Data
+```{r}
+
+#ASV table
+otu.c.rarefied <- read_csv(paste0(rarefaction_data, marker, "_Rarefied_data_OTU_table.csv"))
+otu.c.rarefied
+
+#taxa table
+tax.c.rarefied <- read_csv(paste0(rarefaction_data, marker, "_Rarefied_data_taxa_table.csv")) %>%
+  # assign  algae
+  mutate(Phylum = case_when(Class == "Raphidophyceae" ~ "Gyrista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Phaeophyceae" ~ "Gyrista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Pelagophyceae" ~ "Gyrista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Dictyochophyceae" ~ "Gyrista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Chrysophyceae" ~ "Gyrista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Synurophyceae" ~ "Gyrista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Bolidophyceae" ~ "Gyrista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Eustigmatophyceae" ~ "Gyrista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Oomycota" ~ "Oomycota", T ~ Phylum))  %>%
+  mutate(Phylum = case_when(Class == "Oomycetes" ~ "Oomycota", T ~ Phylum))%>%
+  
+  mutate(Phylum = case_when(Class == "Bigyra" ~ "Bigyra", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Choanoflagellata" ~ "Choanoflagellata", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Cryptophyceae" ~ "Cryptophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Order == "Telonemida" ~ "Cryptophyta", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Haptophyta" ~ "Haptista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Ichthyosporea" ~ "Choanozoa", T ~ Phylum))  %>% 
+  
+  mutate(Class = case_when(Phylum == "Imbricatea" ~ "Imbricatea", T ~ Class)) %>%
+  mutate(Phylum = case_when(Class == "Imbricatea" ~ "Cercozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Phylum %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Phylum)) %>% 
+  mutate(Class = case_when(Class %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Class)) %>% 
+  mutate(Order = case_when(Order %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Order)) %>% 
+  mutate(Family = case_when(Family %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Family)) %>% 
+  mutate(Genus = case_when(Genus %in% c("unknown", "unassigned", "no_hit", "g_") ~ "unknown", T ~ Genus)) %>% 
+  mutate(Species = case_when(Species %in% c("unknown", "unassigned", "no_hit", "s_") ~ "unknown", T ~ Species))
+tax.c.rarefied
+
+#metadata table
+samp.c.rarefied <- read_csv(paste0(rarefaction_data, marker, "_Rarefied_data_metadata_table.csv"))  %>%
+  mutate(sample_source = fct_relevel(sample_source,  "CN23 MARS" , "MBTS 17024", "MBTS 20524", "MBTS 22624", "MBTS 25424", "CN24F 150m exp")) %>%
+  mutate(short_name = "") %>%
+  mutate(short_name = case_when(grepl("eDNA", sample_name) ~ substr(sample_name,1,nchar(sample_name)-9), T ~ short_name)) %>%
+  mutate(short_name = case_when(grepl("CN24F150", sample_name) ~ substr(sample_name,14,nchar(sample_name)-3), T ~ short_name))
+samp.c.rarefied
+
+
+
+#OTU table long format with percent total reads
+potu.c.rarefied <- otu.c.rarefied %>%
+  tidyr::pivot_longer( -ASV, names_to ='sample_name',values_to = 'reads' ) %>%
+  ungroup() %>%
+  group_by(sample_name) %>%
+  mutate(per_tot = reads / sum(reads) *100) %>% #proportions(reads)*100
+  arrange(-reads)
+head(potu.c.rarefied)
+
+
+```
+
+
+
+## Compile data - 
+```{r}
+
+# environmental data
+env_data_rarefied <- inner_join(samp.c.rarefied, potu.c.rarefied, by = c("sample_name")) %>% 
+  left_join(tax.c.rarefied)
+
+env_data_rarefied 
+
+
+```
+
+
+## FIGURE 3 C - number of ASVs per sample - rarefied data
+```{r}
+
+cols <- c("deepskyblue4", "darkolivegreen4")
+pd <- position_dodge(0.4) # dodge position for aligning geom_line with geom_jitter
+cols6 <- c("navyblue", "goldenrod3", "darkmagenta", "firebrick", "firebrick2", "darkolivegreen4", "violetred3")
+
+
+# ASV level
+asv_data <- env_data_rarefied %>% select(sample_name, SAMPLING_station, depth, original_name,sample_source, ASV, reads, sequencer, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  mutate(depth_bin = case_when(depth >= 0 & depth <= 20 ~ "0-20"), 
+                        depth_bin = case_when(depth == 60 ~ "60", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 100 ~ "100", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 150 ~ "150", T ~ depth_bin), 
+                        depth_bin = case_when(depth >= 200 & depth <= 700 ~ "200-700", T ~ depth_bin),
+                        depth_bin = case_when(sample_source == "CN24F 150m exp" ~ "150 - benchtop experiment", T ~ depth_bin),
+                        depth_bin = fct_relevel(depth_bin, "0-20", "60", "100", "150", "150 - benchtop experiment", "200-700"),
+                        source_depth_bin = paste(sample_source, depth_bin, sep = " - "),
+                        source_depth_bin = reorder(source_depth_bin, depth),
+         source_depth_bin = paste(sample_source, depth_bin, sep = " - "),
+         source_depth_bin = reorder(source_depth_bin, depth),
+         SAMPLING_station = case_when(grepl("c1", SAMPLING_station) ~ "C1", T ~ SAMPLING_station),
+         SAMPLING_station = case_when(grepl("MOORING1|Mooring1|MOORING 1", SAMPLING_station) ~ "M1", T ~ SAMPLING_station),
+         SAMPLING_station = case_when(grepl("MOORING2|Mooring2|MOORING 2", SAMPLING_station) ~ "M2", T ~ SAMPLING_station),
+         SAMPLING_station = case_when(grepl("CN24F", sample_name) ~ "Benchtop ESP", T ~ SAMPLING_station),
+         station_depth = paste(SAMPLING_station, depth, sep = " - "), 
+         station_depth = reorder(station_depth, depth),
+         station_depth_bin = paste(SAMPLING_station, depth_bin, sep = " - "),
+         station_depth_bin = reorder(station_depth_bin, depth)) %>%
+  filter(reads > 0) %>%
+  mutate(count = 1) %>%
+  group_by(sample_name) %>%
+  mutate(ASV_count = sum(count)) %>%
+  ungroup() %>%
+  distinct(sample_name, .keep_all = T) %>%
+  mutate(sequencer = fct_relevel(sequencer, "MiSeq", "AVITI")) 
+
+  asv_data %>% ggplot(aes(x=sequencer, y = ASV_count, group = original_name)) +
+  geom_line(position = pd, aes(color = depth_bin), show.legend = F) +
+  scale_color_manual(values = cols6) +
+  new_scale_color() +
+  geom_violin(aes(group = sequencer), alpha = 0, linewidth = 1) + 
+  geom_point(position = pd, aes(fill = depth_bin), shape = 21, size = 3) +
+  scale_fill_manual(values = cols6) +
+  labs(
+    subtitle = get_test_label(kruskal_test(ASV_count ~ sequencer, data = asv_data), detailed = TRUE),
+    color = "Depth Bin (m)",
+    y = "Number of ASVs per sample",
+    x = "Sequencer",
+    fill = "Depth Bin (m)",
+    title = "ASVs per sample - rarefied"
+    )+
+    theme_bw() + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        plot.title = element_text(size = 24, face = "bold"), 
+        plot.subtitle = element_text(size = 20), 
+        plot.caption = element_blank(), 
+        legend.text =  element_text(size = 20, colour = "black"),
+        legend.title =  element_text(face = "bold", size=23),
+        legend.position = "none",
+        axis.text = element_text(size = 20),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 24, face = "bold")
+        ) +
+  guides(fill=guide_legend(override.aes = list(size=7)))
+  
+
+filename = paste(fig3_directory, 'Figure3c_scatter_plot_ASVs_per_sample_rarefied_',proj_prefix,'_',marker,'.png', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 10, width =8, units = 'in')
+  
+
+```
+
+
+
+# #ASVs with 1 read removed per sample
+## Compile data - 
+```{r}
+
+subset <- "ASVs_with_more_than_1_read_per_sample"
+
+
+potu.c.rarefied <- otu.c.rarefied %>%
+  tidyr::pivot_longer( -ASV, names_to ='sample_name',values_to = 'reads' ) %>%
+    filter(!reads <= 1) %>%
+  ungroup() %>%
+  group_by(sample_name) %>%
+  mutate(per_tot = reads / sum(reads) *100) %>% #proportions(reads)*100
+  arrange(-reads)
+head(potu.c.rarefied)
+
+   
+
+
+
+# environmental data
+env_data_rarefied <- inner_join(samp.c.rarefied, potu.c.rarefied, by = c("sample_name")) %>% 
+  left_join(tax.c.rarefied)
+
+env_data_rarefied 
+
+
+```
+
+
+
+
+## FIGURE 3 D - number of ASVs per sample 
+```{r}
+
+cols <- c("deepskyblue4", "darkolivegreen4")
+pd <- position_dodge(0.4) # dodge position for aligning geom_line with geom_jitter
+cols6 <- c("navyblue", "goldenrod3", "darkmagenta", "firebrick", "firebrick2", "darkolivegreen4", "violetred3")
+
+
+# ASV level
+asv_data <- env_data_rarefied %>% select(sample_name, SAMPLING_station, depth, original_name,sample_source, ASV, reads, sequencer, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  mutate(depth_bin = case_when(depth >= 0 & depth <= 20 ~ "0-20"), 
+                        depth_bin = case_when(depth == 60 ~ "60", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 100 ~ "100", T ~ depth_bin), 
+                        depth_bin = case_when(depth == 150 ~ "150", T ~ depth_bin), 
+                        depth_bin = case_when(depth >= 200 & depth <= 700 ~ "200-700", T ~ depth_bin),
+                        depth_bin = case_when(sample_source == "CN24F 150m exp" ~ "150 - benchtop experiment", T ~ depth_bin),
+                        depth_bin = fct_relevel(depth_bin, "0-20", "60", "100", "150", "150 - benchtop experiment", "200-700"),
+                        source_depth_bin = paste(sample_source, depth_bin, sep = " - "),
+                        source_depth_bin = reorder(source_depth_bin, depth),
+         source_depth_bin = paste(sample_source, depth_bin, sep = " - "),
+         source_depth_bin = reorder(source_depth_bin, depth),
+         SAMPLING_station = case_when(grepl("c1", SAMPLING_station) ~ "C1", T ~ SAMPLING_station),
+         SAMPLING_station = case_when(grepl("MOORING1|Mooring1|MOORING 1", SAMPLING_station) ~ "M1", T ~ SAMPLING_station),
+         SAMPLING_station = case_when(grepl("MOORING2|Mooring2|MOORING 2", SAMPLING_station) ~ "M2", T ~ SAMPLING_station),
+         SAMPLING_station = case_when(grepl("CN24F", sample_name) ~ "Benchtop ESP", T ~ SAMPLING_station),
+         station_depth = paste(SAMPLING_station, depth, sep = " - "), 
+         station_depth = reorder(station_depth, depth),
+         station_depth_bin = paste(SAMPLING_station, depth_bin, sep = " - "),
+         station_depth_bin = reorder(station_depth_bin, depth)) %>%
+  filter(reads > 0) %>%
+  mutate(count = 1) %>%
+  group_by(sample_name) %>%
+  mutate(ASV_count = sum(count)) %>%
+  ungroup() %>%
+  distinct(sample_name, .keep_all = T) %>%
+  mutate(sequencer = fct_relevel(sequencer, "MiSeq", "AVITI")) 
+
+
+  asv_data %>% ggplot(aes(x=sequencer, y = ASV_count, group = original_name)) +
+  geom_line(position = pd, aes(color = depth_bin), show.legend = F) +
+  scale_color_manual(values = cols6) +
+  new_scale_color() +
+  geom_violin(aes(group = sequencer), alpha = 0, linewidth = 1) + 
+  geom_point(position = pd, aes(fill = depth_bin), shape = 21, size = 3) +
+  scale_fill_manual(values = cols6) +
+  labs(
+    subtitle = get_test_label(kruskal_test(ASV_count ~ sequencer, data = asv_data), detailed = TRUE),
+    color = "Sequencer",
+    y = "Number of ASVs",
+    x = "Sequencer",
+    fill = "Depth Bin (m)",
+    title = "ASVs per sample - rarefied \nASVs with 1 read in a sample removed"
+    )+
+    theme_bw() + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        plot.title = element_text(size = 24, face = "bold"), 
+        plot.subtitle = element_text(size = 20), 
+        plot.caption = element_blank(), 
+        legend.text =  element_text(size = 20, colour = "black"),
+        legend.title =  element_text(face = "bold", size=23),
+        legend.position = "none",
+        axis.text = element_text(size = 20),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 24, face = "bold")
+        ) +
+  guides(fill=guide_legend(override.aes = list(size=7)))
+  
+
+filename = paste(fig3_directory, 'Figure3d_scatter_plot_ASVs_per_sample_rarefied_ASVs_with_more_than_1_read_per_sample_',proj_prefix,'_',marker,'.png', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 10, width =8, units = 'in')
+  
+
+```
+
+
+
+
+
+
+
+
+
+

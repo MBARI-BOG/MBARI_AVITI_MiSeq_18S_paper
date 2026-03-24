@@ -1159,19 +1159,13 @@ pcscores %>% mutate(depth_bin = case_when(depth >= 0 & depth <= 20 ~ "0-20"),
                         depth_bin = case_when(sample_source == "CN24F 150m exp" ~ "150 - benchtop experiment", T ~ depth_bin),
                         depth_bin = fct_relevel(depth_bin, "0-20", "60", "100", "150", "150 - benchtop experiment", "200-700"),
                         source_depth_bin = paste(sample_source, depth_bin, sep = " - "),
-                        source_depth_bin = reorder(source_depth_bin, depth)) %>%  #merge( aggregate(cbind(mean.x=PC1, mean.y=PC2)~sequencer,pcscores,mean),by="sequencer") %>%
+                        source_depth_bin = reorder(source_depth_bin, depth)) %>% 
   ggplot(aes(PC1,PC2, fill=depth_bin))+
   geom_line(aes(group = original_name, color = depth_bin), linetype = 2, alpha = 0.7) +
   geom_point(size=4, alpha=0.8, aes(shape = sequencer, color = depth_bin)) + 
-  # stat_ellipse(aes(group = depth_bin, color = depth_bin)) +
-  # geom_point(aes(x=mean.x,y=mean.y),size=6)+
-  # geom_segment(aes( x=mean.x, y=mean.y, xend=PC1, yend=PC2)) +
-  # geom_segment(aes(x=mean.x, y=mean.y, xend=PC1, yend=PC2)) +
   scale_shape_manual(values = c(21, 1)) +
     scale_fill_manual(values = cols6) +
     scale_color_manual(values = cols6, guide="none") +
-  # scale_color_tableau(palette = "Tableau 20") +
-  # scale_color_viridis(option = "G", direction = 1, discrete = T, begin=.1, end = .9) +
   labs(x=label.PC1 , 
        y=label.PC2, 
        fill = "Depth Bin (m)",
