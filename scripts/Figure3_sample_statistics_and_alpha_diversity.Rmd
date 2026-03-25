@@ -15,7 +15,7 @@ proj_name <- "AVITI VS MiSeq Comparison"
 data_directory <- paste0('../data/filtered_seq_data/')
 rarefaction_data <- paste0('../data/rarefaction_data/')
 diversity_directory <- paste0("../figures/diversity/")
-# fig_directory <- paste0("../figures/")
+deicode_directory <- paste0('../data/DEICODE/18S/')
 
 getwd()
 fig3_directory <- paste0("../figures/Fig3/")
@@ -42,6 +42,8 @@ library(RColorBrewer) #colors for plotting
 
 library(tidyverse)
 library(phyloseq)
+
+library(ggpubr) # for ggboxplot
 
 # library(taxa)
 # library(metacoder)
@@ -264,6 +266,11 @@ filename = paste(fig3_directory, 'Figure3a_scatter_plot_reads_per_sample_non_rar
   print(marker)
   filename
   ggsave(filename,height = 10, width =8, units = 'in')
+  
+  filename = paste(fig3_directory, 'Figure3a_scatter_plot_reads_per_sample_non_rarefied_',proj_prefix,'_',marker,'.svg', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 10, width =8, units = 'in')
 
 ###########  
  
@@ -273,6 +280,11 @@ filename = paste(fig3_directory, 'Figure3a_scatter_plot_reads_per_sample_non_rar
   fig3_leg
   
   filename = paste(fig3_directory, 'Figure3_legend_',proj_prefix,'_',marker,'.png', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 6, width =8, units = 'in')
+  
+  filename = paste(fig3_directory, 'Figure3_legend_',proj_prefix,'_',marker,'.svg', sep='')
   print(marker)
   filename
   ggsave(filename,height = 6, width =8, units = 'in')
@@ -354,6 +366,11 @@ asv_data <- env_data %>% select(sample_name, SAMPLING_station, depth, original_n
 
 
 filename = paste(fig3_directory, 'Figure3b_scatter_plot_ASVs_per_sample_non_rarefied_',proj_prefix,'_',marker,'.png', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 10, width =8, units = 'in')
+  
+  filename = paste(fig3_directory, 'Figure3b_scatter_plot_ASVs_per_sample_non_rarefied_',proj_prefix,'_',marker,'.svg', sep='')
   print(marker)
   filename
   ggsave(filename,height = 10, width =8, units = 'in')
@@ -520,6 +537,11 @@ filename = paste(fig3_directory, 'Figure3c_scatter_plot_ASVs_per_sample_rarefied
   filename
   ggsave(filename,height = 10, width =8, units = 'in')
   
+  filename = paste(fig3_directory, 'Figure3c_scatter_plot_ASVs_per_sample_rarefied_',proj_prefix,'_',marker,'.svg', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 10, width =8, units = 'in')
+  
 
 ```
 
@@ -631,12 +653,336 @@ filename = paste(fig3_directory, 'Figure3d_scatter_plot_ASVs_per_sample_rarefied
   filename
   ggsave(filename,height = 10, width =8, units = 'in')
   
+  filename = paste(fig3_directory, 'Figure3d_scatter_plot_ASVs_per_sample_rarefied_ASVs_with_more_than_1_read_per_sample_',proj_prefix,'_',marker,'.svg', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 10, width =8, units = 'in')
+  
+
+```
+
+
+# #########
+# diversity statistics on the rarefied data
+## load in the data
+```{r}
+
+rotu_tab_env <- read_csv(paste(rarefaction_data,marker,'_env_Rarefied_asv_table_Rarefied_data.csv', sep=""))%>% column_to_rownames(var = "...1")
+  
+rtax_tab_env <- read_csv(paste(rarefaction_data,marker,'_env_Rarefied_taxa_table_Rarefied_data.csv', sep="")) %>% column_to_rownames(var = "...1")
+  
+rsamp_dat_env <- read_csv(paste(rarefaction_data,marker,'_env_Rarefied_meta_table_Rarefied_data.csv', sep="")) %>% column_to_rownames(var = "sample_name")
+  
+# combine into phyloseq object
+ oBiom_r_env <- merge_phyloseq(otu_table(as.matrix(rotu_tab_env),taxa_are_rows = TRUE),
+                          tax_table(as.matrix(rtax_tab_env)),
+                          sample_data(rsamp_dat_env))
+ 
+oBiom_r_env
 
 ```
 
 
 
+## Chao1
+##### sequencer - Chao1 diversity inex with kruskal-wallis and post hoc dunn test 
+```{r}
 
+
+sample_data(oBiom_r_env)
+  
+  p_oBiom <- plot_richness(oBiom_r_env,x="sequencer", measures=c("Chao1"), nrow=1, color='sequencer') +
+    geom_violin(aes(x=sequencer, y=value)) +
+  # geom_boxplot() +
+    geom_jitter() +
+    theme(text = element_text(size=16), strip.text.x = element_text(size = 16), axis.text = element_text(size = rel(1), colour = "black")) +
+    xlab("sequencer") +
+    labs(subtitle = "Chao1 Diversity") +
+    ggtitle(paste("Community alpha diversity: ",marker,sep=""))+theme_bw() +scale_color_brewer(palette = "Dark2")
+
+  p <- p_oBiom + 
+    scale_fill_brewer(palette = "Spectral") + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  print(p)
+  
+set.seed(1234)
+p_oBiom$data %>% sample_n_by(sequencer, size = 1)
+
+p_oBiom$data <- p_oBiom$data 
+
+p_oBiom$data %>% 
+  group_by(sequencer) %>%
+  get_summary_stats(value, type = "common")
+
+ggboxplot(p_oBiom$data, x = "sequencer", y = "value")
+
+res.kruskal <- p_oBiom$data %>% kruskal_test(value ~ sequencer)
+res.kruskal
+
+p_oBiom$data %>% kruskal_effsize(value ~ sequencer)
+
+# Pairwise comparisons
+pwc <- p_oBiom$data %>% 
+  dunn_test(value ~ sequencer, p.adjust.method = "BH") 
+pwc
+
+
+cols6 <- c("navyblue", "goldenrod3", "darkmagenta", "firebrick", "firebrick2", "darkolivegreen4", "violetred3")
+
+# 
+# # Visualization: box plots with p-values
+pwc <- pwc %>% add_xy_position(x = "sequencer") 
+
+
+pd <- position_dodge(0.2) # dodge position for aligning geom_line with geom_jitter
+
+
+  ggplot(p_oBiom$data, aes(x = fct_rev(sequencer), y = value, group = original_name)) +
+    geom_point(position = pd, aes(fill = depth_bin), shape = 21, size = 3) +
+    scale_fill_manual(values = cols6) +
+    geom_line(position = pd, aes(color = depth_bin), show.legend = "NA") +
+    scale_color_manual(values = cols6) +
+    new_scale_color() +
+    geom_violin(aes(group = sequencer), alpha = 0, linewidth = 1) + 
+    scale_color_manual(values = cols) +
+  stat_pvalue_manual(pwc, hide.ns = TRUE, size = 3.88, bracket.nudge.y = 0, label = "p = {p.adj}") +
+  labs(
+    subtitle = get_test_label(res.kruskal, detailed = TRUE),
+    caption = get_pwc_label(pwc),
+    color = "sequencer",
+    y = "Chao1 Diversity Index",
+    x = "sequencer"
+    )+
+    ggtitle(paste("Chao1 alpha diversity - rarefied"))+
+    theme_bw()+ 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        plot.title = element_text(size = 24, face = "bold"), 
+        plot.subtitle = element_text(size = 20), 
+        plot.caption = element_blank(), 
+        legend.text =  element_text(size = 20, colour = "black"),
+        legend.title =  element_text(face = "bold", size=23),
+        legend.position = "none",
+        axis.text = element_text(size = 20),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 24, face = "bold")
+        ) +
+  guides(fill=guide_legend(override.aes = list(size=7)))
+  
+filename = paste(fig3_directory, 'Figure3e_Chao1_alpha_diversity_',proj_prefix,'_',marker,'.png', sep='')
+print(filename)
+ggsave(filename, width = 8, height = 10, units = "in")
+
+filename = paste(fig3_directory, 'Figure3e_Chao1_alpha_diversity_',proj_prefix,'_',marker,'.svg', sep='')
+print(filename)
+ggsave(filename, width = 8, height = 10, units = "in")
+  
+```
+
+
+
+## Shannon
+##### sequencer - Shannon diversity inex with kruskal-wallis and post hoc dunn test 
+```{r}
+
+sample_data(oBiom_r_env)
+# season "Shannon", , "Simpson", "Chao1"
+  
+  p_oBiom <- plot_richness(oBiom_r_env,x="sequencer", measures=c("Shannon"), nrow=1, color='sequencer') +
+    geom_violin(aes(x=sequencer, y=value)) +
+  # geom_boxplot() +
+    geom_jitter() +
+    theme(text = element_text(size=16), strip.text.x = element_text(size = 16), axis.text = element_text(size = rel(1), colour = "black")) +
+    xlab("sequencer") +
+    labs(subtitle = "Shannon Diversity") +
+    ggtitle(paste("Community alpha diversity: ",marker,sep=""))+theme_bw() +scale_color_brewer(palette = "Dark2")
+
+  p <- p_oBiom + 
+    scale_fill_brewer(palette = "Spectral") + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+  print(p)
+  
+set.seed(1234)
+p_oBiom$data %>% sample_n_by(sequencer, size = 1)
+
+p_oBiom$data <- p_oBiom$data 
+
+p_oBiom$data %>% 
+  group_by(sequencer) %>%
+  get_summary_stats(value, type = "common")
+
+ggboxplot(p_oBiom$data, x = "sequencer", y = "value")
+
+res.kruskal <- p_oBiom$data %>% kruskal_test(value ~ sequencer)
+res.kruskal
+
+p_oBiom$data %>% kruskal_effsize(value ~ sequencer)
+
+# Pairwise comparisons
+pwc <- p_oBiom$data %>% 
+  dunn_test(value ~ sequencer, p.adjust.method = "BH") 
+pwc
+
+pwc2 <- p_oBiom$data %>% 
+  wilcox_test(value ~ sequencer, p.adjust.method = "BH")
+pwc2
+
+cols6 <- c("navyblue", "goldenrod3", "darkmagenta", "firebrick", "firebrick2", "darkolivegreen4", "violetred3")
+
+# 
+# # Visualization: box plots with p-values
+pwc <- pwc %>% add_xy_position(x = "sequencer") 
+
+
+
+pd <- position_dodge(0.2) # dodge position for aligning geom_line with geom_jitter
+
+
+  ggplot(p_oBiom$data, aes(x = fct_rev(sequencer), y = value, group = original_name)) +
+    geom_point(position = pd, aes(fill = depth_bin), shape = 21, size = 3) +
+    scale_fill_manual(values = cols6) +
+    geom_line(position = pd, aes(color = depth_bin), show.legend = "NA") +
+    scale_color_manual(values = cols6) +
+    new_scale_color() +
+    geom_violin(aes(group = sequencer), alpha = 0, linewidth = 1) + 
+    scale_color_manual(values = cols) +
+  # stat_pvalue_manual(pwc, hide.ns = TRUE, size = 3.88, bracket.nudge.y = 0, label = "p = {p.adj}") +
+  labs(
+    subtitle = get_test_label(res.kruskal, detailed = TRUE),
+    caption = get_pwc_label(pwc),
+    color = "sequencer",
+    y = "Shannon Diversity Index",
+    x = "sequencer"
+    )+
+    ggtitle(paste("Shannon alpha diversity - rarefied"))+
+    theme_bw()+ 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        plot.title = element_text(size = 24, face = "bold"), 
+        plot.subtitle = element_text(size = 20), 
+        plot.caption = element_blank(), 
+        legend.text =  element_text(size = 20, colour = "black"),
+        legend.title =  element_text(face = "bold", size=23),
+        legend.position = "none",
+        axis.text = element_text(size = 20),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 24, face = "bold")
+        ) +
+  guides(fill=guide_legend(override.aes = list(size=7)))
+  
+filename = paste(fig3_directory, 'Figure3f_Shannon_alpha_diversity_',proj_prefix,'_',marker,'.png', sep='')
+print(filename)
+ggsave(filename, width = 8, height = 10, units = "in")
+
+filename = paste(fig3_directory, 'Figure3f_Shannon_alpha_diversity_',proj_prefix,'_',marker,'.svg', sep='')
+print(filename)
+ggsave(filename, width = 8, height = 10, units = "in")
+
+
+
+```
+
+
+## Shannon
+##### sequencer - Shannon diversity inex with kruskal-wallis and post hoc dunn test 
+```{r}
+
+sample_data(oBiom_r_env)
+# season "Shannon", , "Simpson", "Chao1"
+  
+  p_oBiom <- plot_richness(oBiom_r_env,x="sequencer", measures=c("Simpson"), nrow=1, color='sequencer') +
+    geom_violin(aes(x=sequencer, y=value)) +
+  # geom_boxplot() +
+    geom_jitter() +
+    theme(text = element_text(size=16), strip.text.x = element_text(size = 16), axis.text = element_text(size = rel(1), colour = "black")) +
+    xlab("sequencer") +
+    labs(subtitle = "Simpson Diversity") +
+    ggtitle(paste("Community alpha diversity: ",marker,sep=""))+theme_bw() +scale_color_brewer(palette = "Dark2")
+
+  p <- p_oBiom + 
+    scale_fill_brewer(palette = "Spectral") + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+  print(p)
+  
+set.seed(1234)
+p_oBiom$data %>% sample_n_by(sequencer, size = 1)
+
+p_oBiom$data <- p_oBiom$data 
+
+p_oBiom$data %>% 
+  group_by(sequencer) %>%
+  get_summary_stats(value, type = "common")
+
+ggboxplot(p_oBiom$data, x = "sequencer", y = "value")
+
+res.kruskal <- p_oBiom$data %>% kruskal_test(value ~ sequencer)
+res.kruskal
+
+p_oBiom$data %>% kruskal_effsize(value ~ sequencer)
+
+# Pairwise comparisons
+pwc <- p_oBiom$data %>% 
+  dunn_test(value ~ sequencer, p.adjust.method = "BH") 
+pwc
+
+pwc2 <- p_oBiom$data %>% 
+  wilcox_test(value ~ sequencer, p.adjust.method = "BH")
+pwc2
+
+cols6 <- c("navyblue", "goldenrod3", "darkmagenta", "firebrick", "firebrick2", "darkolivegreen4", "violetred3")
+
+# 
+# # Visualization: box plots with p-values
+pwc <- pwc %>% add_xy_position(x = "sequencer") 
+
+
+
+pd <- position_dodge(0.2) # dodge position for aligning geom_line with geom_jitter
+
+
+  ggplot(p_oBiom$data, aes(x = fct_rev(sequencer), y = value, group = original_name)) +
+    geom_point(position = pd, aes(fill = depth_bin), shape = 21, size = 3) +
+    scale_fill_manual(values = cols6) +
+    geom_line(position = pd, aes(color = depth_bin), show.legend = "NA") +
+    scale_color_manual(values = cols6) +
+    new_scale_color() +
+    geom_violin(aes(group = sequencer), alpha = 0, linewidth = 1) + 
+    scale_color_manual(values = cols) +
+  # stat_pvalue_manual(pwc, hide.ns = TRUE, size = 3.88, bracket.nudge.y = 0, label = "p = {p.adj}") +
+  labs(
+    subtitle = get_test_label(res.kruskal, detailed = TRUE),
+    caption = get_pwc_label(pwc),
+    color = "sequencer",
+    y = "Simpson Diversity Index",
+    x = "sequencer"
+    )+
+    ggtitle(paste("Simpson alpha diversity - rarefied"))+
+    theme_bw()+ 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        plot.title = element_text(size = 24, face = "bold"), 
+        plot.subtitle = element_text(size = 20), 
+        plot.caption = element_blank(), 
+        legend.text =  element_text(size = 20, colour = "black"),
+        legend.title =  element_text(face = "bold", size=23),
+        legend.position = "none",
+        axis.text = element_text(size = 20),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 24, face = "bold")
+        ) +
+  guides(fill=guide_legend(override.aes = list(size=7)))
+  
+filename = paste(fig3_directory, 'Figure3g_Simpson_alpha_diversity_',proj_prefix,'_',marker,'.png', sep='')
+print(filename)
+ggsave(filename, width = 8, height = 10, units = "in")
+
+filename = paste(fig3_directory, 'Figure3g_Simpson_alpha_diversity_',proj_prefix,'_',marker,'.svg', sep='')
+print(filename)
+ggsave(filename, width = 8, height = 10, units = "in")
+
+
+
+```
 
 
 
