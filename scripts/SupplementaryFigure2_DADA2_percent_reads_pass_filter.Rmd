@@ -1,0 +1,208 @@
+---
+title: "S. Figure 2"
+author: "Jacoby Baker"
+date: "2026-03-25"
+output: html_document
+---
+
+
+
+# Set up directories and variables
+```{r}
+# setwd('scripts/')
+proj_prefix <- "AVITI_MiSeq_comparison"
+proj_name <- "AVITI VS MiSeq Comparison"
+
+data_directory <- paste0('../data/')
+sfig2_directory <- paste0("../figures/SFig2/")
+
+getwd()
+
+marker = "18S"
+```
+
+
+
+# Load libraries
+```{r}
+
+#load libraries
+library(readr) #read csv files
+# library(vegan3d)
+
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(magrittr)
+library(RColorBrewer) #colors for plotting
+library("viridis") # for color fill 
+
+
+library(tidyverse)
+library(phyloseq)
+
+library(taxa)
+# library(metacoder)
+library(ggpubr) # for ggarrange
+library(reshape2) # for presence/absence fig
+
+
+library(ggnewscale) # multiple fill color scales
+
+
+library(ggh4x) # for facet nested wrap
+library(ComplexHeatmap) # for the upset plots
+
+```
+
+
+```{r}
+
+samp.c <- read_csv(paste0(data_directory,"filtered_seq_data/", proj_prefix, "_", marker, "_meta_filtered.csv")) %>%
+  mutate(sample_source = fct_relevel(sample_source,  "CN23 MARS" , "MBTS 17024", "MBTS 20524", "MBTS 22624", "MBTS 25424", "CN24F 150m exp")) %>% select(sample_name, library, source_depth, depth_round, sample_source, seqID, original_name)
+samp.c
+
+
+data <- read_csv(paste0(data_directory,"18S_Dada2_read_track.csv"))  %>% mutate(MiSeq = MiSeq_perc_pass_filter, AVITI = AVITI_perc_pass_filter) %>% select(MiSeq_plate, AVITI_plate, Order, MiSeq, AVITI)  %>% filter(Order < 90) 
+
+data
+
+# dat <- data %>%  pivot_wider( -sample_id, names_to ='sequencer',values_to = 'perc_pass_filter' ) #%>% pivot_wider(names_from = sequencer, values_from=perc_pass_filter)
+
+# dat
+
+
+
+data_long <- read_csv(paste0(data_directory,"18S_Dada2_read_track_long.csv")) %>% mutate(library = sample_id) %>%select(library, perc_pass_filter, Order, sequencer)  %>% filter(Order < 90) %>% left_join(samp.c, by = "library")
+
+data_long 
+
+#dna concentrations
+dna_dat <- read_csv(paste0("../data/DNA_extract_concentrations.csv"))
+dna_dat
+
+
+```
+
+
+
+# paired t-test
+```{r}
+
+plot(MiSeq ~ AVITI, data = data)
+
+
+t.test(x=data$MiSeq, y=data$AVITI, paired = T)
+
+
+```
+
+
+# Make a better plot of the %PF reads for each sequencer
+```{r}
+cols6 <- c("navyblue", "goldenrod3", "darkmagenta", "firebrick", "firebrick2", "darkolivegreen4", "violetred3")
+
+dat <- data_long %>%  mutate(depth_bin = case_when(depth_round >= 0 & depth_round <= 20 ~ "0-20"), 
+                        depth_bin = case_when(depth_round == 60 ~ "60", T ~ depth_bin), 
+                        depth_bin = case_when(depth_round == 100 ~ "100", T ~ depth_bin), 
+                        depth_bin = case_when(depth_round == 150 ~ "150", T ~ depth_bin), 
+                        depth_bin = case_when(depth_round >= 200 & depth_round <= 700 ~ "200-700", T ~ depth_bin),
+                        depth_bin = case_when(sample_source == "CN24F 150m exp" ~ "150 - benchtop experiment", T ~ depth_bin),
+                        depth_bin = fct_relevel(depth_bin, "0-20", "60", "100", "150", "150 - benchtop experiment", "200-700"),
+                        source_depth_bin = paste(sample_source, depth_bin, sep = " - "),
+                        source_depth_bin = reorder(source_depth_bin, depth_round)) %>%
+      # mutate(depth_bin = "",
+      #        depth_bin = case_when(depth_round == 0 ~ "0"), 
+      #                   depth_bin = case_when(depth_round == 10 ~ "10", T ~ depth_bin), 
+      #                   depth_bin = case_when(depth_round == 20 ~ "20", T ~ depth_bin), 
+      #                   depth_bin = case_when(depth_round == 60 ~ "60", T ~ depth_bin), 
+      #                   depth_bin = case_when(depth_round == 100 ~ "100", T ~ depth_bin), 
+      #                   depth_bin = case_when(depth_round == 150 ~ "150", T ~ depth_bin), 
+      #                   depth_bin = case_when(depth_round >= 200 & depth_round <= 700 ~ "200-700", T ~ depth_bin),
+      #                   depth_bin = fct_relevel(depth_bin, "0", "10", "20", "60", "100", "150", "200-700")) %>% 
+  select(sequencer, sample_source, perc_pass_filter, depth_bin, original_name) %>% 
+  left_join(dna_dat) %>%
+  mutate(DNA_quant_ng_ul = round(DNA_quant_ng_ul, digits = 1)) %>%
+  pivot_wider(names_from = sequencer, values_from = perc_pass_filter)
+
+dat
+
+ggplot(dat, aes(y=MiSeq, x=AVITI, color = sample_source)) +
+  geom_point()
+
+
+ggplot(dat, aes(y=MiSeq, x=AVITI, color = depth_bin)) +
+  geom_point() + 
+  scale_color_manual(values = cols6) +
+  geom_abline(intercept = 0, slope = 1, color = "grey20", linetype = "dashed") +
+  geom_text(x=58, y=59, label= "1:1 line", angle = 42, check_overlap = T, color = "grey20")
+
+ggplot(dat, aes(y=MiSeq, x=AVITI, color = DNA_quant_ng_ul)) +
+  geom_point() + 
+  scale_color_gradient(high = "deepskyblue3", low =  "violetred3") +
+  geom_abline(intercept = 0, slope = 1, color = "grey20", linetype = "dashed") +
+  geom_text(x=58, y=59, label= "1:1 line", angle = 42, check_overlap = T, color = "grey20")
+
+ggplot(dat, aes(x=MiSeq, y=AVITI, fill = depth_bin)) +
+  geom_point(aes(size = DNA_quant_ng_ul), shape = 21) + 
+  scale_fill_manual(values = cols6) +
+  geom_abline(intercept = 0, slope = 1, color = "grey20", linetype = "dashed") +
+  geom_text(x=58, y=59, label= "1:1 line", angle = 42, check_overlap = T, color = "grey20") +
+  labs(
+    title = "Percent DADA2 Pass Filter reads for each sample",
+    fill = "Depth bin (m)",
+    size = "DNA concentration (ng/ul)"
+  ) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(),title = element_text(size = 16),
+        axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14)
+        )+ guides(fill = guide_legend(override.aes = list(size=5, shape=21)),
+            shape = guide_legend(override.aes = list(size = 5, shape = c(19, 1))))
+
+filename = paste(sfig2_directory, 'SFig2_DADA2_pass_filter_reads_',proj_prefix, '_', marker, '.png', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 8, width =10, units = 'in')
+
+
+  filename = paste(sfig2_directory, 'SFig2_DADA2_pass_filter_reads_',proj_prefix, '_', marker, '.svg', sep='')
+  print(marker)
+  filename
+  ggsave(filename,height = 8, width =10, units = 'in')
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
