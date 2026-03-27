@@ -100,6 +100,15 @@ dna_dat <- read_csv(paste0("../data/DNA_extract_concentrations.csv"))
 dna_dat
 
 
+#OTU table long format with percent total reads
+potu.c <- otu.c %>%
+  tidyr::pivot_longer( -ASV, names_to ='sample_name',values_to = 'reads' ) %>%
+  ungroup() %>%
+  group_by(sample_name) %>%
+  mutate(per_tot = reads / sum(reads) *100) %>% #proportions(reads)*100
+  arrange(-reads)
+head(potu.c)
+
 ```
 
 # Supplemental Figure 4A - Dada2 Pass Filter reads
@@ -189,7 +198,7 @@ filename = paste(sfig4_directory, 'SFig4a_AVITI_subsampled_raw_fastq_DADA2_pass_
 
 
 # Supplemental Figure 4B - RPCA
-# PHYLOSEQ  ALL SAMPLES
+## PHYLOSEQ  ALL SAMPLES
 define function
 ```{r}
 vegan_otu <- function(physeq) {
@@ -582,18 +591,411 @@ ggsave(filename,height = 7, width =9, units = 'in')
 
 
 
+# Supplemental Figure 4C - Total reads
+
+
+## Compile data - 
+```{r}
+
+# environmental data
+env_data <- inner_join(samp.c, potu.c, by = c("sample_name")) %>% 
+  left_join(tax.c %>% 
+  # assign  algae
+  mutate(Phylum = case_when(Class == "Raphidophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Phaeophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Pelagophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Dictyochophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Chrysophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Synurophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Bolidophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Eustigmatophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  # assign oomycotes
+  mutate(Phylum = case_when(Class == "Oomycota" ~ "Oomycota", T ~ Phylum))  %>%
+  mutate(Phylum = case_when(Class == "Oomycetes" ~ "Oomycota", T ~ Phylum))%>%
+  # assign microeuk
+  mutate(Phylum = case_when(Class == "Bigyra" ~ "Bigyra", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Choanoflagellata" ~ "Choanoflagellata", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Cryptophyceae" ~ "Cryptista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Order == "Telonemida" ~ "Cryptista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Haptophyta" ~ "Haptista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Centroplasthelida" ~ "Haptista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Ichthyosporea" ~ "Choanozoa", T ~ Phylum))  %>% 
+  
+  mutate(Class = case_when(Phylum == "Imbricatea" ~ "Imbricatea", T ~ Class)) %>%
+  mutate(Phylum = case_when(Class == "Imbricatea" ~ "Cercozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Polycystinea" ~ "Retaria", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Acantharea" ~ "Retaria", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Breviatea" ~ "Sulcozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Aphelidea" ~ "Aphelida", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Filasterea" ~ "Choanozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Phylum %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Phylum)) %>% 
+  mutate(Class = case_when(Class %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Class)) %>% 
+  mutate(Order = case_when(Order %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Order)) %>% 
+  mutate(Family = case_when(Family %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Family)) %>% 
+  mutate(Genus = case_when(Genus %in% c("unknown", "unassigned", "no_hit", "g_") ~ "unknown", T ~ Genus)) %>% 
+  mutate(Species = case_when(Species %in% c("unknown", "unassigned", "no_hit", "s_") ~ "unknown", T ~ Species)))
+
+env_data 
+
+
+```
 
 
 
+## Total Reads
+## by sequencer
+#### all reads
+```{r}
+
+taxas <- c('Species') # , 'Kingdom', 'Class', 'Order', 'Family', 'Genus', 'Species'
+  
+  print(paste(marker,"results"))
+  
+ sample_taxa_comp <- env_data %>%
+      # full_join(species_label) %>%
+  filter(reads > 0) 
+  
+#get number of samples per year/month and sample_source
+spp_counts <-  sample_taxa_comp %>% 
+  filter(reads > 0) %>%
+  select(sample_source, sequencer, Phylum, Class, Order, Family, Genus, Species) %>%
+  # mutate(count = 1) %>%
+  dplyr::ungroup() %>%
+  distinct(sample_source, sequencer, Phylum, Class, Order, Family, Genus, Species, .keep_all = T) %>%
+  mutate(count = 1) %>%
+  # group_by(sample_name) %>%
+  # mutate(count = 1) %>%
+  # ungroup() %>%
+  dplyr::group_by(sample_source, sequencer) %>%
+  mutate(new_count = sum(count)) %>%
+  dplyr::ungroup() %>%
+  distinct(sample_source, sequencer, .keep_all = T)
+
+  spp_counts
+  
+  
+  
+  
+  # assign(paste0("samp.c_",marker),samp.c)
+  for (val in taxas) {
+    taxa_level = sym(val)
+  
+  
+    top_20_spp <- sample_taxa_comp %>% 
+      group_by(Phylum, Class, Order, Family, Genus, Species) %>%
+      mutate(sum_per_tot = sum(per_tot)) %>%
+      distinct(Phylum, Class, Order, Family, Genus, Species, .keep_all = TRUE ) %>%
+      arrange(-sum_per_tot) %>%
+      select( Phylum, Class, Order, Family, Genus, Species, sum_per_tot, sample_source) %>%
+      # print(n = Inf) %>%
+      ungroup() %>%
+      select( Phylum, Class, Order, Family, Genus, Species, sum_per_tot)%>%
+    top_n(20) %>%
+    mutate(top_20_spp = "yes") 
+  
+    
+  large_color_palette_cal <- c("black", "slategray3", "deepskyblue4", "darkgoldenrod4", "lightgoldenrod3",  "indianred1", "violetred3", "#55ad89", "darkseagreen2", "chocolate2", "orange1", 
+                              "sienna4", "hotpink2", "darkolivegreen4", "honeydew2", "goldenrod3", "gold1", "darkmagenta",  "plum3", "slateblue3", "darkslategray3"
+                               )
+  
+  select_sample <- sample_taxa_comp %>%
+    left_join(spp_counts) %>%
+    full_join(top_20_spp) %>%
+    mutate(top_20_spp = case_when(top_20_spp == "yes" ~ "yes",
+                                  TRUE ~ "no")) %>%
+    mutate(Species = case_when(top_20_spp == "no" ~ paste0("(not top 20 Taxa)"),
+                                     TRUE ~ !!taxa_level)) %>%
+      ungroup() %>%
+      select(sample_name, ASV, Phylum, Class, Order, Family, Genus, Species, !!taxa_level,reads, per_tot, sample_source, sequencer, SC, source_depth, new_count, top_20_spp) %>%
+      group_by(sample_source, sequencer) %>%
+      mutate(pcr_reads = sum(reads)) %>%
+      # mutate(sum_per_tot = sum(per_tot)) %>%
+      ungroup() %>%
+    group_by(sample_source, sequencer, Phylum, Class, Order, Family, Genus, Species) %>%
+      mutate(pcr_taxa_reads = sum(reads)) %>%
+      mutate(pcr_per_tot_taxa_reads = (pcr_taxa_reads/pcr_reads)*100) %>%
+      ungroup() %>%
+      distinct(sample_source, sequencer, Phylum, Class, Order, Family, Genus, Species, .keep_all = TRUE) 
+    
+    select_sample
+    
+    
+    textcol <- "grey40"
+    print(textcol)
+    
+    sample_line_plot <-  select_sample %>% 
+      mutate(ord_fam_gen = "") %>%
+      mutate(ord_fam_gen = paste(Phylum, Class, Order, Family, Genus, Species, sep = ", ")) %>%
+      mutate(ord_fam_gen = case_when(Species ==  "(not top 20 Taxa)" ~ "(not top 20 Taxa)", T ~ ord_fam_gen)) %>%
+      ungroup() %>% 
+      # mutate(sample_name_fct = fct_reorder(as_factor(sample_name), source_depth)) %>%
+      ggplot(aes(x=sequencer, y= pcr_taxa_reads)) +
+    geom_bar(stat = 'identity', aes(fill = ord_fam_gen), size = .5, color = "black") +
+    geom_text(aes(label=new_count, y= -30000), size = 5) +
+      scale_y_continuous(breaks = seq(from = 0, to = 1200000, by = 200000), labels = scales::label_comma()) +
+    labs(title = paste("Total reads per sequencer"), 
+         subtitle = "Raw AVITI .fastq files subsampled",
+         x="# of Species\nSequencer",
+         y="Total reads by sample set",
+         fill = "Phylum, Class, Order, Family, Genus, Species") +
+      scale_fill_manual(values = large_color_palette_cal) +
+      facet_nested_wrap(sample_source  ~ ., scales = "free_x", nrow = 1) +
+    theme(
+      #legend
+      legend.position="bottom",legend.direction="vertical",
+      legend.text=element_text(colour=textcol,size=12,face="bold"),
+      legend.title=element_text(colour=textcol,size=15,face="bold"),
+      axis.text=element_text(size=13,colour=textcol),
+      axis.title = element_text(size=15),
+      plot.title = element_text(size = 25),
+      plot.subtitle = element_text(size = 22),
+      # axis.ticks.x = element_blank(),
+      plot.background=element_blank(),
+      panel.border=element_blank(),
+      panel.background = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.grid.major = element_blank(),
+      # plot.margin=margin(0.1,0.1,0.1,0.1,"cm"),
+      strip.text = element_text(size=12, face = "bold", angle = 0),
+      # strip.background = element_rect(fill = "white", color = "black"),
+      # strip.background = element_rect(),
+      # strip.text.y.left = element_blank(),
+      # strip.text.y.right = element_blank()
+      ) +
+      guides(fill=guide_legend(ncol=1, title.position="top"))
+  print(sample_line_plot) 
+  
+  filename = paste(sfig4_directory, 'SFig4c_AVITI_subsampled_raw_fastq_total_reads_by_sample_set_',proj_prefix, '_', marker, '.png', sep='')
+print('Plot of PC1PC2 colored by Year:')
+filename
+ggsave(filename,height = 13, width =10, units = 'in')
+
+
+filename = paste(sfig4_directory, 'SFig4c_AVITI_subsampled_raw_fastq_total_reads_by_sample_set_',proj_prefix, '_', marker, '.svg', sep='')
+print('Plot of PC1PC2 colored by Year:')
+filename
+ggsave(filename,height = 13, width =10, units = 'in')
+   
+   
+  }
+
+  
+  
+  
+```
 
 
 
+# Supplemental Figure 4D - Upset plot
+
+## setup dataset variable
+```{r}
+dataset <- "all_samples"
+dataset1 <- "All samples"
+# grep_search <- "Kelp"
+comparisons <- c("MiSeq", "AVITI")
+
+```
+
+## Add bar chart with % reads of taxa in the entire dataset
+
+```{r}
+
+
+taxa_data <- env_data %>%
+  filter(reads > 0) %>%
+  select(sample_name, -ASV, reads, per_tot, sequencer, Phylum, Class, Order, Family, Genus, Species) %>%
+  group_by(sample_name, Phylum, Class, Order, Family, Genus, Species) %>%
+  mutate(reads = sum(reads), per_tot = sum(per_tot)) %>%
+  ungroup() %>%
+  distinct(sample_name, Phylum, Class, Order, Family, Genus, Species, .keep_all = T) %>%
+  group_by(sample_name) %>%
+  mutate(sample_tot_reads = sum(reads)) %>%
+  ungroup() %>%
+  group_by(sequencer) %>%
+  mutate(seq_tot_reads = sum(reads))  %>%
+  ungroup() %>%
+  group_by(sequencer, Phylum, Class, Order, Family, Genus, Species) %>%
+  mutate(seq_taxa_reads = sum(reads), seq_taxa_per_tot = seq_taxa_reads/seq_tot_reads*100) %>%
+  ungroup() %>%
+  distinct(sequencer, Phylum, Class, Order, Family, Genus, Species, .keep_all = T) %>%
+  select(sequencer, Phylum, Class, Order, Family, Genus, Species, seq_taxa_per_tot) %>% 
+  mutate(present = case_when(seq_taxa_per_tot > 0 ~ 1, T ~ 0)) %>%
+  select(-seq_taxa_per_tot) %>%
+  arrange(sequencer) %>%
+  pivot_wider(names_from = "sequencer", values_from = "present", values_fill = 0) 
+
+
+taxa_data
+
+comb_data <- make_comb_mat(taxa_data)
+comb_data
+set_name(comb_data)
+comb_name(comb_data)
+set_size(comb_data)
+comb_size(comb_data)
+comb_degree(comb_data)
+t(comb_data)
 
 
 
+ long_dat_pres_taxa <- env_data %>%
+  filter(reads > 0) %>%
+  select(sample_name, -ASV, reads, per_tot, sequencer, Phylum, Class, Order, Family, Genus, Species) %>%
+  group_by(sample_name, Phylum, Class, Order, Family, Genus, Species) %>%
+  mutate(reads = sum(reads), per_tot = sum(per_tot)) %>%
+  ungroup() %>%
+  distinct(sample_name, Phylum, Class, Order, Family, Genus, Species, .keep_all = T) %>%
+  group_by(sample_name) %>%
+  mutate(sample_tot_reads = sum(reads)) %>%
+  ungroup() %>%
+  group_by(sequencer) %>%
+  mutate(seq_tot_reads = sum(reads))  %>%
+  ungroup() %>%
+  group_by(sequencer, Phylum, Class, Order, Family, Genus, Species) %>%
+  mutate(seq_taxa_reads = sum(reads), seq_taxa_per_tot = seq_taxa_reads/seq_tot_reads*100) %>%
+  ungroup() %>%
+  distinct(sequencer, Phylum, Class, Order, Family, Genus, Species, .keep_all = T) %>%
+  select(sequencer, Phylum, Class, Order, Family, Genus, Species, seq_tot_reads, seq_taxa_reads, seq_taxa_per_tot)
+  
+
+ long_dat_pres_taxa
+ 
+sequencers = colnames(taxa_data)[7:8]
+sequencers
+
+taxa_data[sequencers] = taxa_data[sequencers] == 1
+t(head(taxa_data[sequencers], 100))
 
 
+top_20_spp <- env_data %>%
+  filter(reads > 0) %>%
+  select(sample_name, -ASV, reads, per_tot, sequencer, Phylum, Class, Order, Family, Genus, Species) %>%
+  group_by(sample_name, Phylum, Class, Order, Family, Genus, Species) %>%
+  mutate(reads = sum(reads), per_tot = sum(per_tot)) %>%
+  ungroup() %>%
+  distinct(sample_name, Phylum, Class, Order, Family, Genus, Species, .keep_all = T) %>%
+      group_by(Phylum) %>% 
+      mutate(sum_per_tot = sum(per_tot)) %>%
+      distinct(Phylum,.keep_all = TRUE ) %>% 
+      arrange(-sum_per_tot) %>%
+      select( Phylum, sum_per_tot) %>%
+      ungroup()  %>%
+    top_n(20) %>%
+    mutate(top_20_spp = "yes") %>%
+      select( Phylum, top_20_spp)
+top_20_spp
 
+     
+ large_color_palette_cal <- c("black", "slategray3", "deepskyblue4", "darkgoldenrod4", "lightgoldenrod3",  "indianred1", "violetred3", "#55ad89", "darkseagreen2", "chocolate2", "orange1", 
+                              "sienna4", "hotpink2", "darkolivegreen4", "honeydew2", "goldenrod3", "gold1", "darkmagenta",  "plum3", "slateblue3", "darkslategray3",
+                              "red", "green", "blue", "yellow", "purple", "brown", "darkgreen", "skyblue1"
+                               )
+ 
+
+ updated3 <- long_dat_pres_taxa %>%
+  mutate(full_tax = paste(Phylum)) %>%
+    full_join(top_20_spp) %>%
+    mutate(top_20_spp = case_when(top_20_spp == "yes" ~ "yes",
+                                  TRUE ~ "no")) %>%
+    mutate(full_tax = case_when(top_20_spp == "no" ~ paste0("(not top 20 Taxa)"),
+                                     TRUE ~ full_tax)) 
+
+test <- updated3 %>% full_join(taxa_data, by=c("Phylum", "Class", "Order", "Family", "Genus", "Species")) %>% 
+  group_by_at(vars(13:14, 2:7)) %>%
+  mutate(seq_taxa_reads_2 = sum(seq_taxa_reads), seq_tot_reads_2 = sum(seq_tot_reads), seq_taxa_per_tot_2 = seq_taxa_reads_2/seq_tot_reads_2*100) %>% 
+  ungroup() %>%
+  distinct_at(vars(13:14, 2:7), .keep_all = T) 
+
+test %>% filter(AVITI == "FALSE")
+  
+
+ 
+ p <- upset(
+    test,
+    sequencers,
+    mode = "distinct",
+    annotations = list(
+        'seq_taxa_per_tot_2'=(
+            ggplot(mapping=aes(fill=reorder(full_tax, seq_taxa_per_tot_2)))
+            + geom_bar(stat='identity', aes(y = seq_taxa_per_tot_2)) # , color = "grey20"
+            # + geom_bar(stat='identity', position='fill', aes(y = pore_taxa_reads))
+            # + scale_y_continuous(labels=scales::percent_format())
+            # + scale_fill_manual(values=c(
+            #     'R'='#E41A1C', 'PG'='#377EB8',
+            #     'PG-13'='#4DAF4A', 'NC-17'='#FF7F00'
+            # ))
+            + scale_fill_manual(values = large_color_palette_cal, name = "Top 20 Phylum")
+            + ylab('Percent taxa reads in the dataset') 
+            + labs(title = paste("Upset plot - number of taxa and % reads of taxa in each combination", sep = " "))
+            + theme(legend.position = "right", 
+              legend.direction = "vertical",
+              legend.text = element_text(size = 14),
+              title = element_text(size = 22),
+              axis.text.y = element_text(size = 16),
+              axis.title = element_text(size = 20, face = "bold"))
+      + guides(fill=guide_legend(ncol=1))
+        )
+    ),
+    width_ratio=0.1,
+    themes=upset_modify_themes(
+        list(
+            'intersections_matrix'=theme(text=element_text(size=20))))
+  ,
+    base_annotations=list(
+    'Number of unique taxa'=intersection_size(
+      counts=TRUE, 
+      mapping=aes(fill=full_tax),
+      text=list(check_overlap=TRUE, size = 8),
+    ) + scale_fill_manual(values = large_color_palette_cal, guide='none') +
+      theme(
+        axis.text.y = element_text(size = 16),
+        axis.title = element_text(size = 20, face = "bold")
+      )
+  ),
+    set_sizes=(
+        upset_set_size(
+            geom=geom_bar(
+                aes(fill=full_tax, x=group), # , color = "grey20"
+                width=0.8
+            ),
+            position='right',
+        ) + scale_fill_manual(values = large_color_palette_cal, guide='none')
+        + labs(title = "Number of taxa")
+        + geom_text(aes(label=..count..), hjust=.5, vjust = 1, stat='count', angle = 90)
+        + expand_limits(y=1600)
+        + theme(axis.ticks.x=element_line(),
+            title = element_text(size = 12))
+    ), 
+guides = 'collect', 
+sort_intersections_by='degree',
+sort_sets=FALSE
+)
+ 
+ p
+ 
+filename = paste(sfig4_directory, 'SFig4d_AVITI_subsampled_raw_fastq_upset_plot_',proj_prefix, '_', marker, '.png', sep='')
+print('Plot of PC1PC2 colored by Year:')
+filename
+ggsave(filename,height = 12, width =14, units = 'in')
+
+
+filename = paste(sfig4_directory, 'SFig4d_AVITI_subsampled_raw_fastq_upset_plot_',proj_prefix, '_', marker, '.svg', sep='')
+print('Plot of PC1PC2 colored by Year:')
+filename
+ggsave(filename,height = 12, width =14, units = 'in')
+
+
+```
 
 
 
