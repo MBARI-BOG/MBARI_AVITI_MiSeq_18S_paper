@@ -1,0 +1,69 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' class='svglite' width='1800.00pt' height='360.00pt' viewBox='0 0 1800.00 360.00'>
+<defs>
+  <style type='text/css'><![CDATA[
+    .svglite line, .svglite polyline, .svglite polygon, .svglite path, .svglite rect, .svglite circle {
+      fill: none;
+      stroke: #000000;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-miterlimit: 10.00;
+    }
+    .svglite text {
+      white-space: pre;
+    }
+  ]]></style>
+</defs>
+<rect width='100%' height='100%' style='stroke: none; fill: none;'/>
+<defs>
+  <clipPath id='cpMC4wMHwxODAwLjAwfDAuMDB8MzYwLjAw'>
+    <rect x='0.00' y='0.00' width='1800.00' height='360.00' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpMC4wMHwxODAwLjAwfDAuMDB8MzYwLjAw)'>
+<rect x='116.53' y='67.48' width='1566.95' height='225.04' style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />
+<text x='122.01' y='89.42' style='font-size: 20.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='436.90px' lengthAdjust='spacingAndGlyphs'>Phylum, Class, Order, Family, Genus, Species</text>
+<rect x='122.71' y='97.67' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #000000;' />
+<rect x='122.71' y='114.95' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #9FB6CD;' />
+<rect x='122.71' y='132.23' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #00688B;' />
+<rect x='122.71' y='149.51' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #8B6508;' />
+<rect x='122.71' y='166.79' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #CDBE70;' />
+<rect x='122.71' y='184.07' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #FF6A6A;' />
+<rect x='122.71' y='201.35' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #CD3278;' />
+<rect x='122.71' y='218.63' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #55AD89;' />
+<rect x='122.71' y='235.91' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #B4EEB4;' />
+<rect x='122.71' y='253.19' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #EE7621;' />
+<rect x='122.71' y='270.47' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #FFA500;' />
+<rect x='961.61' y='97.67' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #8B4726;' />
+<rect x='961.61' y='114.95' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #EE6AA7;' />
+<rect x='961.61' y='132.23' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #6E8B3D;' />
+<rect x='961.61' y='149.51' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #E0EEE0;' />
+<rect x='961.61' y='166.79' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #CD9B1D;' />
+<rect x='961.61' y='184.07' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #FFD700;' />
+<rect x='961.61' y='201.35' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #8B008B;' />
+<rect x='961.61' y='218.63' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #CD96CD;' />
+<rect x='961.61' y='235.91' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #6959CD;' />
+<rect x='961.61' y='253.19' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; stroke-linejoin: miter; fill: #79CDCD;' />
+<text x='144.77' y='111.72' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='135.99px' lengthAdjust='spacingAndGlyphs'>(not top 20 Taxa)</text>
+<text x='144.77' y='129.00' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='550.61px' lengthAdjust='spacingAndGlyphs'>Arthropoda, Hexanauplia, Calanoida, Calanidae, unknown, unknown</text>
+<text x='144.77' y='146.28' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='561.01px' lengthAdjust='spacingAndGlyphs'>Arthropoda, Hexanauplia, Calanoida, Metridinidae, Metridia, unknown</text>
+<text x='144.77' y='163.56' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='610.23px' lengthAdjust='spacingAndGlyphs'>Arthropoda, Hexanauplia, Calanoida, Paracalanidae, Paracalanus, unknown</text>
+<text x='144.77' y='180.84' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='544.89px' lengthAdjust='spacingAndGlyphs'>Arthropoda, Hexanauplia, Calanoida, unknown, unknown, unknown</text>
+<text x='144.77' y='198.12' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='606.32px' lengthAdjust='spacingAndGlyphs'>Arthropoda, Hexanauplia, Cyclopoida, Oithonidae, Oithona, Oithona similis</text>
+<text x='144.77' y='215.40' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='740.67px' lengthAdjust='spacingAndGlyphs'>Bacillariophyta, Bacillariophyceae, Bacillariales, Bacillariaceae, Pseudo-nitzschia, unknown</text>
+<text x='144.77' y='232.68' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='804.82px' lengthAdjust='spacingAndGlyphs'>Bacillariophyta, Coscinodiscophyceae, Chaetocerotales, Chaetocerotaceae, Chaetoceros, unknown</text>
+<text x='144.77' y='249.96' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='810.57px' lengthAdjust='spacingAndGlyphs'>Bacillariophyta, Coscinodiscophyceae, Thalassiosirales, Thalassiosiraceae, Thalassiosira, unknown</text>
+<text x='144.77' y='267.24' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='776.50px' lengthAdjust='spacingAndGlyphs'>Bacillariophyta, Coscinodiscophyceae, Thalassiosirales, Thalassiosiraceae, unknown, unknown</text>
+<text x='144.77' y='284.52' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='692.32px' lengthAdjust='spacingAndGlyphs'>Cercozoa, Imbricatea, Thaumatomonadida, Thaumatomastigidae, Protaspis, unknown</text>
+<text x='983.66' y='111.72' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='661.18px' lengthAdjust='spacingAndGlyphs'>Chordata, Appendicularia, Copelata, Oikopleuridae, Oikopleura, Oikopleura dioica</text>
+<text x='983.66' y='129.00' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='541.09px' lengthAdjust='spacingAndGlyphs'>Cnidaria, Hydrozoa, Siphonophorae, unknown, unknown, unknown</text>
+<text x='983.66' y='146.28' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='690.53px' lengthAdjust='spacingAndGlyphs'>Dinophyceae, Dinophyceae, Gonyaulacales, Gonyaulacaceae, Alexandrium, unknown</text>
+<text x='983.66' y='163.56' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='694.25px' lengthAdjust='spacingAndGlyphs'>Dinophyceae, Dinophyceae, Syndiniales, Amoebophryaceae, Amoebophrya, unknown</text>
+<text x='983.66' y='180.84' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='654.56px' lengthAdjust='spacingAndGlyphs'>Dinophyceae, Dinophyceae, Syndiniales, Amoebophryaceae, unknown, unknown</text>
+<text x='983.66' y='198.12' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='577.05px' lengthAdjust='spacingAndGlyphs'>Dinophyceae, Dinophyceae, Syndiniales, unknown, unknown, unknown</text>
+<text x='983.66' y='215.40' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='557.16px' lengthAdjust='spacingAndGlyphs'>Dinophyceae, Dinophyceae, unknown, unknown, unknown, unknown</text>
+<text x='983.66' y='232.68' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='537.30px' lengthAdjust='spacingAndGlyphs'>Euglenozoa, unknown, Diplonemea, unknown, unknown, unknown</text>
+<text x='983.66' y='249.96' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='590.21px' lengthAdjust='spacingAndGlyphs'>unknown, unknown, unknown, unknown, unknown, Acantharian sp. 6201</text>
+<text x='983.66' y='267.24' style='font-size: 17.00px; font-weight: bold;fill: #666666; font-family: "Arial";' textLength='494.74px' lengthAdjust='spacingAndGlyphs'>unknown, unknown, unknown, unknown, unknown, unknown</text>
+</g>
+</svg>

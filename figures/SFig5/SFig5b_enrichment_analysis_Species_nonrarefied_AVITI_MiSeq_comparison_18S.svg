@@ -1,0 +1,61 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' class='svglite' width='720.00pt' height='504.00pt' viewBox='0 0 720.00 504.00'>
+<defs>
+  <style type='text/css'><![CDATA[
+    .svglite line, .svglite polyline, .svglite polygon, .svglite path, .svglite rect, .svglite circle {
+      fill: none;
+      stroke: #000000;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-miterlimit: 10.00;
+    }
+    .svglite text {
+      white-space: pre;
+    }
+  ]]></style>
+</defs>
+<rect width='100%' height='100%' style='stroke: none; fill: none;'/>
+<defs>
+  <clipPath id='cpMC4wMHw3MjAuMDB8MC4wMHw1MDQuMDA='>
+    <rect x='0.00' y='0.00' width='720.00' height='504.00' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpMC4wMHw3MjAuMDB8MC4wMHw1MDQuMDA=)'>
+</g>
+<defs>
+  <clipPath id='cpNjAuMDd8NTQ2LjM4fDI3Ljg1fDQwNC40Ng=='>
+    <rect x='60.07' y='27.85' width='486.32' height='376.61' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpNjAuMDd8NTQ2LjM4fDI3Ljg1fDQwNC40Ng==)'>
+<polyline points='60.07,327.80 546.38,327.80 ' style='stroke-width: 0.53; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='60.07,208.71 546.38,208.71 ' style='stroke-width: 0.53; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='60.07,89.63 546.38,89.63 ' style='stroke-width: 0.53; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='60.07,387.34 546.38,387.34 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='60.07,268.25 546.38,268.25 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='60.07,149.17 546.38,149.17 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='60.07,30.08 546.38,30.08 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='303.23,404.46 303.23,27.85 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<rect x='120.86' y='190.04' width='121.58' height='197.30' style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; stroke-linejoin: miter; fill: #F8766D;' />
+<rect x='242.44' y='373.16' width='121.58' height='14.18' style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; stroke-linejoin: miter; fill: #00BA38;' />
+<rect x='364.02' y='89.63' width='121.58' height='297.71' style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; stroke-linejoin: miter; fill: #619CFF;' />
+<text x='516.08' y='39.07' text-anchor='end' style='font-size: 14.23px; font-style: italic; font-family: "Arial";' textLength='303.07px' lengthAdjust='spacingAndGlyphs'>* Adjusted P-value &lt; 0.05 (Unique vs. Common)</text>
+</g>
+<g clip-path='url(#cpMC4wMHw3MjAuMDB8MC4wMHw1MDQuMDA=)'>
+<text x='55.13' y='392.72' text-anchor='end' style='font-size: 15.00px;fill: #4D4D4D; font-family: "Arial";' textLength='21.68px' lengthAdjust='spacingAndGlyphs'>0%</text>
+<text x='55.13' y='273.64' text-anchor='end' style='font-size: 15.00px;fill: #4D4D4D; font-family: "Arial";' textLength='21.68px' lengthAdjust='spacingAndGlyphs'>5%</text>
+<text x='55.13' y='154.55' text-anchor='end' style='font-size: 15.00px;fill: #4D4D4D; font-family: "Arial";' textLength='30.02px' lengthAdjust='spacingAndGlyphs'>10%</text>
+<text x='55.13' y='35.46' text-anchor='end' style='font-size: 15.00px;fill: #4D4D4D; font-family: "Arial";' textLength='30.02px' lengthAdjust='spacingAndGlyphs'>15%</text>
+<text transform='translate(310.84,417.00) rotate(-45)' text-anchor='end' style='font-size: 15.00px;fill: #4D4D4D; font-family: "Arial";' textLength='84.21px' lengthAdjust='spacingAndGlyphs'>Foraminifera</text>
+<text x='303.23' y='494.54' text-anchor='middle' style='font-size: 18.00px; font-family: "Arial";' textLength='60.01px' lengthAdjust='spacingAndGlyphs'>Phylum</text>
+<text transform='translate(18.39,216.15) rotate(-90)' text-anchor='middle' style='font-size: 18.00px; font-family: "Arial";' textLength='300.15px' lengthAdjust='spacingAndGlyphs'>Percentage of Total Species in Group</text>
+<text x='562.82' y='193.95' style='font-size: 18.00px; font-family: "Arial";' textLength='50.03px' lengthAdjust='spacingAndGlyphs'>Group</text>
+<rect x='563.53' y='202.13' width='15.86' height='15.86' style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; stroke-linejoin: miter; fill: #F8766D;' />
+<rect x='563.53' y='219.41' width='15.86' height='15.86' style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; stroke-linejoin: miter; fill: #00BA38;' />
+<rect x='563.53' y='236.69' width='15.86' height='15.86' style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; stroke-linejoin: miter; fill: #619CFF;' />
+<text x='585.58' y='215.44' style='font-size: 15.00px; font-family: "Arial";' textLength='93.41px' lengthAdjust='spacingAndGlyphs'>AVITI_Unique</text>
+<text x='585.58' y='232.72' style='font-size: 15.00px; font-family: "Arial";' textLength='123.46px' lengthAdjust='spacingAndGlyphs'>Detected_by_Both</text>
+<text x='585.58' y='250.00' style='font-size: 15.00px; font-family: "Arial";' textLength='98.42px' lengthAdjust='spacingAndGlyphs'>MiSeq_Unique</text>
+<text x='60.07' y='18.39' style='font-size: 18.00px; font-family: "Arial";' textLength='614.28px' lengthAdjust='spacingAndGlyphs'>Distribution of Unique/Shared Species by Phylum and Sequencer, Unrarefied</text>
+</g>
+</svg>

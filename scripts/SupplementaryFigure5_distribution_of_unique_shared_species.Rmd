@@ -1,0 +1,2080 @@
+---
+title: "ASV taxa comparisons"
+author: "Katherine Silliman"
+date: "2026-03-27"
+output: html_document
+---
+
+
+
+
+Adapted from J. Baker's ASV_seq_comparisions.Rmd.
+
+# Set up directories and variables
+```{r}
+# setwd('scripts/')
+proj_prefix <- "AVITI_MiSeq_comparison"
+proj_name <- "AVITI VS MiSeq Comparison"
+
+subset_data_directory <- paste0('../data/AVITI_subsetted/filtered_seq_data/')
+subset_rare_data <- paste0('../data/AVITI_subsetted/rarefaction_data/')
+data_directory <- paste0('../data/filtered_seq_data/')
+rarefaction_data <- paste0('../data/rarefaction_data/')
+
+getwd()
+enrichment_directory <- paste0("../data/enrichment_analysis/")
+sfig5_directory <- paste0("../figures/SFig5/")
+
+marker = "18S"
+```
+
+# Load libraries
+```{r}
+library(tidyverse)
+library(ggplot2)
+```
+
+# UnRarefied data
+```{r}
+#ASV table
+otu.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_asv_filtered.csv"))
+head(otu.c)
+
+#taxa table
+tax.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_taxa_filtered.csv"))
+head(tax.c)
+
+# add corrected phyla
+#class2phyla <- read_csv(paste0(data_directory,"phyla_unknown_aviti_class2phyla.csv"))
+
+# Perform the update using left_join and mutate
+#tax.c_updated <- tax.c %>%
+#  left_join(class2phyla, by = c("Class" = "orig_class")) %>%
+#  mutate(Phylum = ifelse(!is.na(corr_phylum), corr_phylum, Phylum)) %>%
+#  select(-corr_phylum) # Remove the temporary join column
+
+#metadata table
+samp.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_meta_filtered.csv")) %>%
+  mutate(sample_source = fct_relevel(sample_source,  "CN23 MARS" , "MBTS 17024", "MBTS 20524", "MBTS 22624", "MBTS 25424", "CN24F 150m exp")) %>%
+  mutate(short_name = "") %>%
+  mutate(short_name = case_when(grepl("eDNA", sample_name) ~ substr(sample_name,1,nchar(sample_name)-9), T ~ short_name)) %>%
+  mutate(short_name = case_when(grepl("CN24F150", sample_name) ~ substr(sample_name,14,nchar(sample_name)-3), T ~ short_name))
+  
+head(samp.c)
+
+seq.c <- read_csv(paste0(data_directory, proj_prefix, "_", marker, "_seq_filtered.csv"))
+head(seq.c)
+
+#OTU table long format with percent total reads
+potu.c <- otu.c %>%
+  tidyr::pivot_longer( -ASV, names_to ='sample_name',values_to = 'reads' ) %>%
+  ungroup() %>%
+  group_by(sample_name) %>%
+  mutate(per_tot = reads / sum(reads) *100) %>% #proportions(reads)*100
+  arrange(-reads)
+head(potu.c)
+```
+
+
+## set lowest taxonomic annotation level for ASVs
+```{r}
+
+species_label <- tax.c  %>%
+  # assign  algae
+  mutate(Phylum = case_when(Class == "Raphidophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Phaeophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Pelagophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Dictyochophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Chrysophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Synurophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Bolidophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Eustigmatophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  # assign oomycotes
+  mutate(Phylum = case_when(Class == "Oomycota" ~ "Oomycota", T ~ Phylum))  %>%
+  mutate(Phylum = case_when(Class == "Oomycetes" ~ "Oomycota", T ~ Phylum))%>%
+  # assign microeuk
+  mutate(Phylum = case_when(Class == "Bigyra" ~ "Bigyra", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Choanoflagellata" ~ "Choanoflagellata", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Cryptophyceae" ~ "Cryptista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Order == "Telonemida" ~ "Cryptista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Haptophyta" ~ "Haptista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Centroplasthelida" ~ "Haptista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Ichthyosporea" ~ "Choanozoa", T ~ Phylum))  %>% 
+  
+  mutate(Class = case_when(Phylum == "Imbricatea" ~ "Imbricatea", T ~ Class)) %>%
+  mutate(Phylum = case_when(Class == "Imbricatea" ~ "Cercozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Polycystinea" ~ "Retaria", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Acantharea" ~ "Retaria", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Breviatea" ~ "Sulcozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Aphelidea" ~ "Aphelida", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Filasterea" ~ "Choanozoa", T ~ Phylum)) %>%
+  
+  mutate(Kingdom = case_when(Kingdom %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Kingdom)) %>%
+  mutate(Phylum = case_when(Phylum %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Phylum)) %>% 
+  mutate(Class = case_when(Class %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Class)) %>% 
+  mutate(Order = case_when(Order %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Order)) %>% 
+  mutate(Family = case_when(Family %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Family)) %>% 
+  mutate(Genus = case_when(Genus %in% c("unknown", "unassigned", "no_hit", "g_") ~ "unknown", T ~ Genus)) %>% 
+  mutate(Species = case_when(Species %in% c("unknown", "unassigned", "no_hit", "s_") ~ "unknown", T ~ Species))
+
+```
+
+
+
+
+```{r}
+# Compile data - 
+# environmental data
+env_data <- inner_join(samp.c, potu.c, by = c("sample_name")) %>% 
+  left_join(species_label)
+
+head(env_data)
+
+
+```
+
+
+## SHARED/UNIQUE Taxa
+
+```{r}
+length(unique(env_data$Species))
+dim(env_data %>% select(sample_name, ASV, reads, sequencer, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  # filter(grepl(paste(grep_search), sample_name)) %>%
+  filter(reads > 0))
+```
+
+## Unique taxa strings in Phyla
+```{r}
+taxa_data_unique <- env_data %>% select(sample_name, ASV, reads, sequencer, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  filter(reads > 0) %>%
+  group_by(sequencer, Phylum, Class, Order, Family, Genus,Species) %>%
+  mutate(sum_reads_unique= sum(reads)) %>%
+  ungroup() %>%
+  distinct(sequencer, Phylum, Class, Order, Family, Genus, Species, .keep_all = T) %>%
+  mutate(present = case_when(sum_reads_unique> 0 ~ 1, T ~ 0)) %>% 
+  select(-ASV,-sample_name, -reads, -sum_reads_unique) %>%
+  pivot_wider(names_from = "sequencer", values_from = "present", values_fill = 0)
+
+shared_uniq <- taxa_data_unique %>%
+  filter(MiSeq == 1 & AVITI == 1)
+
+
+MiSeq_uniq <- taxa_data_unique %>%
+  filter(MiSeq == 1 & AVITI == 0)
+
+
+AVITI_uniq <- taxa_data_unique %>%
+  filter(MiSeq == 0 & AVITI == 1)
+
+  
+  
+#comb_data <- make_comb_mat(data)
+
+# Display the number of unique species found by each sequencer
+cat("Number of unique taxa detected by MiSeq:", nrow((MiSeq_uniq)), "\n")
+cat("Number of unique taxa detected by AVITI:", nrow(AVITI_uniq), "\n")
+cat("Number of shared taxa detected:", nrow(shared_uniq), "\n")
+
+```
+
+```{r}
+# Create a combined dataset of taxas unique to each sequencer
+# Add a column 'DetectionSource' to indicate which sequencer detected it uniquely
+all_unique_detections_uniq <- bind_rows(
+  MiSeq_uniq %>% mutate(DetectionSource = "MiSeq_Unique"),
+  AVITI_uniq%>% mutate(DetectionSource = "AVITI_Unique")
+)
+
+# only keep phyla with at least 5 ASVs in at least 1 sequencer
+phylum_contingency_table_uniq <- all_unique_detections_uniq %>%
+  count(Phylum, DetectionSource) %>%
+  pivot_wider(names_from = DetectionSource, values_from = n, values_fill = 0) 
+
+cat("\nContingency Table (Phylum vs. Unique Detection Source):\n")
+print(phylum_contingency_table_uniq)
+
+```
+
+### Phylum-specific Enrichment Analysis (Unique vs. Common Taxa) 
+This section compares the phylum distribution of taxas unique to each sequencer against the phylum distribution of taxas detected by *both* sequencers.
+
+```{r}
+phyla_combined_uniq <- unique(c(all_unique_detections_uniq$Phylum, shared_uniq$Phylum))
+enrichment_results_unique_vs_common_uniq <- data.frame(
+  Phylum = character(),
+  Comparison = character(), # e.g., "SequencerA_Unique_vs_Both", "SequencerB_Unique_vs_Both"
+  OddsRatio = numeric(),
+  P_Value = numeric(),
+  Adjusted_P_Value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+```
+
+```{r}
+for (phy in phyla_combined_uniq) {
+  # --- Comparison: SequencerA_Unique vs. ASV_Both ---
+  count_phy_A_unique <- sum(MiSeq_uniq$Phylum == phy)
+  count_not_phy_A_unique <- sum(MiSeq_uniq$Phylum != phy)
+  
+  count_phy_both <- sum(shared_uniq$Phylum == phy)
+  count_not_phy_both <- sum(shared_uniq$Phylum != phy)
+  
+  contingency_matrix_A_vs_Both <- matrix(c(count_phy_A_unique, count_not_phy_A_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("MiSeq_Unique", "Taxa_Both")))
+  
+  if (sum(contingency_matrix_A_vs_Both) > 0) {
+    fisher_test_A_vs_Both <- fisher.test(contingency_matrix_A_vs_Both, alternative = "two.sided")
+    odds_ratio_A_vs_Both <- fisher_test_A_vs_Both$estimate
+    p_value_A_vs_Both <- fisher_test_A_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common_uniq <- bind_rows(enrichment_results_unique_vs_common_uniq, data.frame(
+      Phylum = phy,
+      Comparison = "MiSeq_Unique_vs_Both",
+      OddsRatio = odds_ratio_A_vs_Both,
+      P_Value = p_value_A_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Phylum '", phy, "' (A_Unique vs Both) due to no data.\n"))
+  }
+
+# --- Comparison: SequencerB_Unique vs. Species_Both ---
+  count_phy_B_unique <- sum(AVITI_uniq$Phylum == phy)
+  count_not_phy_B_unique <- sum(AVITI_uniq$Phylum != phy)
+  
+  contingency_matrix_B_vs_Both <- matrix(c(count_phy_B_unique, count_not_phy_B_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("AVITI_Unique", "Taxa_Both")))
+  
+  if (sum(contingency_matrix_B_vs_Both) > 0) {
+    fisher_test_B_vs_Both <- fisher.test(contingency_matrix_B_vs_Both, alternative = "two.sided")
+    odds_ratio_B_vs_Both <- fisher_test_B_vs_Both$estimate
+    p_value_B_vs_Both <- fisher_test_B_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common_uniq <- bind_rows(enrichment_results_unique_vs_common_uniq, data.frame(
+      Phylum = phy,
+      Comparison = "AVITI_Unique_vs_Both",
+      OddsRatio = odds_ratio_B_vs_Both,
+      P_Value = p_value_B_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Phylum '", phy, "' (B_Unique vs Both) due to no data.\n"))
+  }
+}
+
+# Adjust p-values for multiple comparisons across all unique vs. common tests
+if (nrow(enrichment_results_unique_vs_common_uniq) > 0) {
+  enrichment_results_unique_vs_common_uniq$Adjusted_P_Value <- p.adjust(enrichment_results_unique_vs_common_uniq$P_Value, method = "BH")
+  
+  cat("\nIndividual Phylum Enrichment Analysis Results (Unique vs. Common - Fisher's Exact Test):\n")
+  print(enrichment_results_unique_vs_common_uniq %>% arrange(Adjusted_P_Value))
+  
+  cat("\nInterpretation of Individual Phylum Enrichment Analysis (Unique vs. Common):\n")
+  cat("- 'OddsRatio' > 1 for 'SequencerA_Unique_vs_Both' suggests enrichment in SequencerA_Unique relative to Taxa detected by both.\n")
+  cat("- 'OddsRatio' < 1 for 'SequencerA_Unique_vs_Both' suggests depletion in SequencerA_Unique relative to Taxa detected by both.\n")
+  cat("- Similar interpretation applies for 'SequencerB_Unique_vs_Both'.\n")
+  cat("- 'P_Value' indicates significance for that specific phylum and comparison.\n")
+  cat("- 'Adjusted_P_Value' accounts for multiple comparisons.\n")
+} else {
+  cat("\nNo phyla found for individual enrichment analysis (Unique vs. Common).\n")
+}
+```
+```{r}
+filename <- paste(enrichment_directory, proj_prefix, '_', marker, '_enrichment_results_uniqueTaxa_in_Phyla.csv', sep='')
+write.csv(enrichment_results_unique_vs_common_uniq %>% arrange(Adjusted_P_Value),filename,row.names = FALSE,quote = FALSE )
+```
+
+# ## S.FIG. 5A
+```{r}
+plot_data_categorized_uniq <- bind_rows(
+  MiSeq_uniq %>% mutate(DetectionGroup = "MiSeq_Unique"),
+  AVITI_uniq %>% mutate(DetectionGroup = "AVITI_Unique"),
+  shared_uniq %>% mutate(DetectionGroup = "Detected_by_Both")
+)
+
+# Calculate percentages for plotting across all three groups
+phylum_percentages_overall_uniq <- plot_data_categorized_uniq %>%
+  group_by(DetectionGroup, Phylum) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  group_by(DetectionGroup) %>%
+  mutate(Percentage = Count / sum(Count))
+
+# Determine which phyla are significant based on enrichment_results_unique_vs_common
+# A phylum is marked with '*' if either SequencerA_Unique_vs_Both or SequencerB_Unique_vs_Both is significant
+significant_phyla_for_plot <- enrichment_results_unique_vs_common_uniq %>%
+  filter(Adjusted_P_Value < 0.05) %>%
+  distinct(Phylum) %>%
+  mutate(Label = "*")
+
+# Merge significance labels into the plot data for correct positioning
+plot_data_with_significance <- phylum_percentages_overall_uniq %>%
+  left_join(significant_phyla_for_plot, by = "Phylum") %>%
+  filter(!is.na(Label))
+
+# Find the maximum percentage for each phylum to position the asterisk
+max_percentage_per_phylum <- plot_data_with_significance %>%
+  group_by(Phylum) %>%
+  summarise(Max_Percentage = max(Percentage), .groups = 'drop')
+
+# Join max percentage back to the significance data for plotting
+significant_phyla_labels <- significant_phyla_for_plot %>%
+  left_join(max_percentage_per_phylum, by = "Phylum") %>%
+  mutate(Y_Position = Max_Percentage + 0.02) # Add a small offset above the bar
+
+
+# This bar plot helps visualize the phylum distribution for species
+# unique to each sequencer and those detected by both, as percentages.
+ggplot(plot_data_with_significance, aes(x = Phylum, y = Percentage, fill = DetectionGroup)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Distribution of Unique/Shared Taxa by Phylum and Sequencer, Unrarefied",
+       x = "Phylum",
+       y = "Percentage of Total Taxa in Group",
+       fill = "Group") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, max(plot_data_with_significance$Percentage) * 1.1)) + # Adjust y-axis limit
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1,size=15),
+        axis.text.y = element_text(size=15),
+        axis.title = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        legend.text = element_text(size = 15),
+        plot.title = element_text(size = 18)) +
+  # Add asterisks for significant phyla
+  geom_text(data = significant_phyla_labels, aes(x = Phylum, y = Y_Position, label = Label),
+            inherit.aes = FALSE, size = 6, color = "black") +
+  # Add a small legend for the asterisk
+  annotate("text", x = Inf, y = Inf, label = "* Adjusted P-value < 0.05 (Unique vs. Common)",
+           hjust = 1.1, vjust = 1.1, size = 5, color = "black", fontface = "italic")
+
+
+filename = paste(sfig5_directory, 'SFig5a_enrichment_analysis_Taxa_nonrarefied_',proj_prefix, '_', marker, '.png', sep='')
+filename
+ggsave(filename,height = 7, width =10, units = 'in')
+
+filename = paste(sfig5_directory, 'SFig5a_enrichment_analysis_Taxa_nonrarefied_',proj_prefix, '_', marker, '.svg', sep='')
+filename
+ggsave(filename,height = 7, width =10, units = 'in')
+
+```
+```{r}
+phylum_percentages_overall_uniq %>%
+  filter(Phylum %in% significant_phyla_for_plot$Phylum) %>%
+  select(-Percentage) %>%
+  pivot_wider(names_from = DetectionGroup, values_from = Count)
+
+phylum_percentages_overall_uniq %>%
+  filter(Phylum %in% significant_phyla_for_plot$Phylum) %>%
+  select(-Count) %>%
+  pivot_wider(names_from = DetectionGroup, values_from = Percentage)
+
+```
+
+## Species in Phyla. 
+```{r}
+taxa_data_spp <- env_data %>% select(sample_name, ASV, reads, sequencer, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  # filter(grepl(paste(grep_search), sample_name)) %>%
+  filter(reads > 0) %>%
+  group_by(sequencer, Species) %>%
+  mutate(sum_reads_spp = sum(reads)) %>%
+  ungroup() %>%
+  distinct(sequencer, Species, .keep_all = T) %>%
+  mutate(present = case_when(sum_reads_spp > 0 ~ 1, T ~ 0)) %>% 
+  select(-ASV,-sample_name, -reads, -sum_reads_spp) %>%
+  pivot_wider(names_from = "sequencer", values_from = "present", values_fill = 0) %>% arrange(Species)
+
+shared_spp <- taxa_data_spp %>%
+  filter(MiSeq == 1 & AVITI == 1)
+
+
+MiSeq_spp <- taxa_data_spp %>%
+  filter(MiSeq == 1 & AVITI == 0)
+
+
+AVITI_spp <- taxa_data_spp %>%
+  filter(MiSeq == 0 & AVITI == 1)
+
+  
+  
+#comb_data <- make_comb_mat(data)
+
+# Display the number of unique species found by each sequencer
+cat("Number of unique species detected by MiSeq:", nrow((MiSeq_spp)), "\n")
+cat("Number of unique species detected by AVITI:", nrow(AVITI_spp), "\n")
+cat("Number of shared species detected:", nrow(shared_spp), "\n")
+
+```
+
+```{r}
+# Create a combined dataset of species unique to each sequencer
+# Add a column 'DetectionSource' to indicate which sequencer detected it uniquely
+all_unique_detections <- bind_rows(
+  MiSeq_spp %>% mutate(DetectionSource = "MiSeq_Unique"),
+  AVITI_spp%>% mutate(DetectionSource = "AVITI_Unique")
+)
+
+phylum_contingency_table <- all_unique_detections %>%
+  count(Phylum, DetectionSource) %>%
+  pivot_wider(names_from = DetectionSource, values_from = n, values_fill = 0)
+
+cat("\nContingency Table (Phylum vs. Unique Detection Source):\n")
+print(phylum_contingency_table)
+
+```
+### Test unique species against each other
+```{r}
+# Convert the contingency table to a matrix for statistical testing
+# Remove the Phylum column before converting to matrix
+phylum_matrix <- as.matrix(phylum_contingency_table[, -1])
+rownames(phylum_matrix) <- phylum_contingency_table$Phylum
+
+# Perform a Chi-squared test of independence
+# This test determines if there is a significant association between
+# the sequencer (as the source of unique species) and the phylum distribution.
+# A small p-value (typically < 0.05) suggests a significant association.
+# Note: Chi-squared test assumptions include sufficient expected cell counts.
+# If expected counts are low (<5), Fisher's exact test is more appropriate.
+# We'll check for this.
+# Check expected counts for Chi-squared test
+chi_sq_test_result <- chisq.test(phylum_matrix, simulate.p.value = FALSE)
+cat("\nChi-squared Test Results:\n")
+print(chi_sq_test_result)
+
+# Get expected values
+expected_counts <- chi_sq_test_result$expected
+cat("\nExpected Counts for Chi-squared Test:\n")
+print(expected_counts)
+```
+
+```{r}
+# Check if any expected counts are too low for Chi-squared test
+if (any(expected_counts < 5)) {
+  cat("\nWarning: Some expected counts are less than 5. Fisher's Exact Test might be more appropriate.\n")
+  # Perform Fisher's Exact Test if Chi-squared assumptions are violated
+  # Fisher's exact test is suitable for small sample sizes and sparse tables.
+  fisher_test_result <- fisher.test(phylum_matrix,workspace=2e8)
+  cat("\nFisher's Exact Test Results:\n")
+  print(fisher_test_result)
+} else {
+  cat("\nExpected counts are sufficient for Chi-squared test.\n")
+}
+```
+#### Enrichment test
+```{r}
+enrichment_results <- data.frame(
+  Phylum = character(),
+  Sequencer_Enriched = character(),
+  OddsRatio = numeric(),
+  P_Value = numeric(),
+  Adjusted_P_Value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# Get all unique phyla present in the unique detections
+all_phyla <- unique(all_unique_detections$Phylum)
+
+cat("\n--- Phylum-specific Enrichment Analysis ---\n")
+
+for (phy in all_phyla) {
+  # Create a 2x2 contingency table for the current phylum
+  # Row 1: Species in 'phy' vs. Species NOT in 'phy'
+  # Column 1: Unique to SequencerA vs. Unique to SequencerB
+
+  # Count of unique species in current phylum for SequencerA
+  count_phy_A <- sum(all_unique_detections$Phylum == phy & all_unique_detections$DetectionSource == "MiSeq_Unique")
+  # Count of unique species NOT in current phylum for SequencerA
+  count_not_phy_A <- sum(all_unique_detections$Phylum != phy & all_unique_detections$DetectionSource == "MiSeq_Unique")
+
+  # Count of unique species in current phylum for SequencerB
+  count_phy_B <- sum(all_unique_detections$Phylum == phy & all_unique_detections$DetectionSource == "AVITI_Unique")
+  # Count of unique species NOT in current phylum for SequencerB
+  count_not_phy_B <- sum(all_unique_detections$Phylum != phy & all_unique_detections$DetectionSource == "AVITI_Unique")
+
+  # Construct the 2x2 matrix for Fisher's exact test
+  # Matrix structure:
+  #         SequencerA_Unique   SequencerB_Unique
+  # Phylum_X      a                   b
+  # Not_Phylum_X  c                   d
+  # where a = count_phy_A, b = count_phy_B, c = count_not_phy_A, d = count_not_phy_B
+  
+  contingency_matrix <- matrix(c(count_phy_A, count_not_phy_A,
+                                 count_phy_B, count_not_phy_B),
+                               nrow = 2, byrow = FALSE,
+                               dimnames = list(c(phy, paste0("Not_", phy)),
+                                               c("MiSeq_Unique", "AVITI_Unique")))
+
+  # Perform Fisher's Exact Test
+  # alternative = "two.sided" tests for enrichment or depletion
+  # alternative = "greater" tests for enrichment in the first column (SequencerA_Unique)
+  # alternative = "less" tests for enrichment in the second column (SequencerB_Unique)
+  
+  # For a general enrichment analysis, we often look for enrichment in either direction.
+  # However, to specify which sequencer it's enriched in, we can look at the odds ratio.
+  # If OR > 1, enriched in SequencerA_Unique relative to SequencerB_Unique
+  # If OR < 1, enriched in SequencerB_Unique relative to SequencerA_Unique
+  
+  if (sum(contingency_matrix) > 0) { # Ensure there's data to test
+    fisher_test <- fisher.test(contingency_matrix, alternative = "two.sided")
+    
+    odds_ratio <- fisher_test$estimate
+    p_value <- fisher_test$p.value
+    
+    sequencer_enriched <- "None"
+    if (odds_ratio > 1 && p_value < 0.05) { # Arbitrary p-value threshold for initial indication
+      sequencer_enriched <- "MiSeq_Unique"
+    } else if (odds_ratio < 1 && p_value < 0.05) {
+      sequencer_enriched <- "AVITI_Unique"
+    }
+    
+    enrichment_results <- bind_rows(enrichment_results, data.frame(
+      Phylum = phy,
+      Sequencer_Enriched = sequencer_enriched,
+      OddsRatio = odds_ratio,
+      P_Value = p_value
+    ))
+  } else {
+      cat(paste0("Skipping Fisher's test for Phylum '", phy, "' due to no data.\n"))
+  }
+}
+
+# Adjust p-values for multiple comparisons (e.g., using Benjamini-Hochberg method)
+if (nrow(enrichment_results) > 0) {
+  enrichment_results$Adjusted_P_Value <- p.adjust(enrichment_results$P_Value, method = "BH")
+  
+  cat("\nIndividual Phylum Enrichment Analysis Results (Fisher's Exact Test):\n")
+  print(enrichment_results %>% arrange(Adjusted_P_Value))
+  
+  cat("\nInterpretation of Individual Phylum Enrichment Analysis:\n")
+  cat("- 'OddsRatio' > 1 suggests enrichment in SequencerA_Unique relative to SequencerB_Unique.\n")
+  cat("- 'OddsRatio' < 1 suggests enrichment in SequencerB_Unique relative to SequencerA_Unique.\n")
+  cat("- 'P_Value' indicates significance for that specific phylum.\n")
+  cat("- 'Adjusted_P_Value' accounts for multiple comparisons (important for controlling False Discovery Rate).\n")
+  cat("- A 'Sequencer_Enriched' value indicates a significant enrichment (p < 0.05) in that sequencer.\n")
+} else {
+  cat("\nNo phyla found for individual enrichment analysis.\n")
+}
+```
+
+```{r}
+# Calculate percentages for plotting
+phylum_percentages <- all_unique_detections %>%
+  group_by(DetectionSource, Phylum) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  group_by(DetectionSource) %>%
+  mutate(Percentage = Count / sum(Count))
+
+# This bar plot helps visualize the phylum distribution for species
+# uniquely detected by each sequencer, as percentages.
+ggplot(phylum_percentages, aes(x = Phylum, y = Percentage, fill = DetectionSource)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Phylum Distribution of Species Unique to Each Sequencer (Percentages)",
+       x = "Phylum",
+       y = "Percentage of Unique Species",
+       fill = "Sequencer") +
+  scale_y_continuous(labels = scales::percent) + # Format y-axis as percentages
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Phylum-specific Enrichment Analysis (Unique vs. Common Species) 
+This section compares the phylum distribution of species unique to each sequencer against the phylum distribution of species detected by *both* sequencers.
+
+```{r}
+all_phyla_combined <- unique(c(all_unique_detections$Phylum, shared_spp$Phylum))
+enrichment_results_unique_vs_common <- data.frame(
+  Phylum = character(),
+  Comparison = character(), # e.g., "SequencerA_Unique_vs_Both", "SequencerB_Unique_vs_Both"
+  OddsRatio = numeric(),
+  P_Value = numeric(),
+  Adjusted_P_Value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+```
+
+```{r}
+for (phy in all_phyla_combined) {
+  # --- Comparison: SequencerA_Unique vs. Species_Both ---
+  count_phy_A_unique <- sum(MiSeq_spp$Phylum == phy)
+  count_not_phy_A_unique <- sum(MiSeq_spp$Phylum != phy)
+  
+  count_phy_both <- sum(shared_spp$Phylum == phy)
+  count_not_phy_both <- sum(shared_spp$Phylum != phy)
+  
+  contingency_matrix_A_vs_Both <- matrix(c(count_phy_A_unique, count_not_phy_A_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("MiSeq_Unique", "Species_Both")))
+  
+  if (sum(contingency_matrix_A_vs_Both) > 0) {
+    fisher_test_A_vs_Both <- fisher.test(contingency_matrix_A_vs_Both, alternative = "two.sided")
+    odds_ratio_A_vs_Both <- fisher_test_A_vs_Both$estimate
+    p_value_A_vs_Both <- fisher_test_A_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common <- bind_rows(enrichment_results_unique_vs_common, data.frame(
+      Phylum = phy,
+      Comparison = "MiSeq_Unique_vs_Both",
+      OddsRatio = odds_ratio_A_vs_Both,
+      P_Value = p_value_A_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Phylum '", phy, "' (A_Unique vs Both) due to no data.\n"))
+  }
+
+# --- Comparison: SequencerB_Unique vs. Species_Both ---
+  count_phy_B_unique <- sum(AVITI_spp$Phylum == phy)
+  count_not_phy_B_unique <- sum(AVITI_spp$Phylum != phy)
+  
+  contingency_matrix_B_vs_Both <- matrix(c(count_phy_B_unique, count_not_phy_B_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("AVITI_Unique", "Species_Both")))
+  
+  if (sum(contingency_matrix_B_vs_Both) > 0) {
+    fisher_test_B_vs_Both <- fisher.test(contingency_matrix_B_vs_Both, alternative = "two.sided")
+    odds_ratio_B_vs_Both <- fisher_test_B_vs_Both$estimate
+    p_value_B_vs_Both <- fisher_test_B_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common <- bind_rows(enrichment_results_unique_vs_common, data.frame(
+      Phylum = phy,
+      Comparison = "AVITI_Unique_vs_Both",
+      OddsRatio = odds_ratio_B_vs_Both,
+      P_Value = p_value_B_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Phylum '", phy, "' (B_Unique vs Both) due to no data.\n"))
+  }
+}
+
+# Adjust p-values for multiple comparisons across all unique vs. common tests
+if (nrow(enrichment_results_unique_vs_common) > 0) {
+  enrichment_results_unique_vs_common$Adjusted_P_Value <- p.adjust(enrichment_results_unique_vs_common$P_Value, method = "BH")
+  
+  cat("\nIndividual Phylum Enrichment Analysis Results (Unique vs. Common - Fisher's Exact Test):\n")
+  print(enrichment_results_unique_vs_common %>% arrange(Adjusted_P_Value))
+  
+  cat("\nInterpretation of Individual Phylum Enrichment Analysis (Unique vs. Common):\n")
+  cat("- 'OddsRatio' > 1 for 'SequencerA_Unique_vs_Both' suggests enrichment in SequencerA_Unique relative to species detected by both.\n")
+  cat("- 'OddsRatio' < 1 for 'SequencerA_Unique_vs_Both' suggests depletion in SequencerA_Unique relative to species detected by both.\n")
+  cat("- Similar interpretation applies for 'SequencerB_Unique_vs_Both'.\n")
+  cat("- 'P_Value' indicates significance for that specific phylum and comparison.\n")
+  cat("- 'Adjusted_P_Value' accounts for multiple comparisons.\n")
+} else {
+  cat("\nNo phyla found for individual enrichment analysis (Unique vs. Common).\n")
+}
+```
+```{r}
+filename <- paste(enrichment_directory, proj_prefix, '_', marker, '_enrichment_results_uniqueSpp_in_Phyla.csv', sep='')
+write.csv(enrichment_results_unique_vs_common %>% arrange(Adjusted_P_Value),filename,row.names = FALSE,quote = FALSE )
+```
+
+# ## S.FIG. 5B
+```{r}
+plot_data_categorized <- bind_rows(
+  MiSeq_spp %>% mutate(DetectionGroup = "MiSeq_Unique"),
+  AVITI_spp %>% mutate(DetectionGroup = "AVITI_Unique"),
+  shared_spp %>% mutate(DetectionGroup = "Detected_by_Both")
+)
+
+# Calculate percentages for plotting across all three groups
+phylum_percentages_overall <- plot_data_categorized %>%
+  group_by(DetectionGroup, Phylum) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  group_by(DetectionGroup) %>%
+  mutate(Percentage = Count / sum(Count))
+
+# Determine which phyla are significant based on enrichment_results_unique_vs_common
+# A phylum is marked with '*' if either SequencerA_Unique_vs_Both or SequencerB_Unique_vs_Both is significant
+significant_phyla_for_plot <- enrichment_results_unique_vs_common %>%
+  filter(Adjusted_P_Value < 0.05) %>%
+  distinct(Phylum) %>%
+  mutate(Label = "*")
+
+# Merge significance labels into the plot data for correct positioning
+plot_data_with_significance <- phylum_percentages_overall %>%
+  left_join(significant_phyla_for_plot, by = "Phylum") %>% 
+  filter(!is.na(Label))
+
+# Find the maximum percentage for each phylum to position the asterisk
+max_percentage_per_phylum <- plot_data_with_significance %>%
+  group_by(Phylum) %>%
+  summarise(Max_Percentage = max(Percentage), .groups = 'drop')
+
+# Join max percentage back to the significance data for plotting
+significant_phyla_labels <- significant_phyla_for_plot %>%
+  left_join(max_percentage_per_phylum, by = "Phylum") %>%
+  mutate(Y_Position = Max_Percentage + 0.02) # Add a small offset above the bar
+
+
+# This bar plot helps visualize the phylum distribution for species
+# unique to each sequencer and those detected by both, as percentages.
+ggplot(plot_data_with_significance, aes(x = Phylum, y = Percentage, fill = DetectionGroup)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Distribution of Unique/Shared Species by Phylum and Sequencer, Unrarefied",
+       x = "Phylum",
+       y = "Percentage of Total Species in Group",
+       fill = "Group") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, max(plot_data_with_significance$Percentage) * 1.15)) + # Adjust y-axis limit
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1,size=15),
+        axis.text.y = element_text(size=15),
+        axis.title = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        legend.text = element_text(size = 15),
+        plot.title = element_text(size = 18)) +
+  # Add asterisks for significant phyla
+  geom_text(data = significant_phyla_labels, aes(x = Phylum, y = Y_Position, label = Label),
+            inherit.aes = FALSE, size = 6, color = "black") +
+  # Add a small legend for the asterisk
+  annotate("text", x = Inf, y = Inf, label = "* Adjusted P-value < 0.05 (Unique vs. Common)",
+           hjust = 1.1, vjust = 1.1, size = 5, color = "black", fontface = "italic")
+
+
+filename = paste(sfig5_directory, 'SFig5b_enrichment_analysis_Species_nonrarefied_',proj_prefix, '_', marker, '.png', sep='')
+filename
+ggsave(filename,height = 7, width =10, units = 'in')
+
+filename = paste(sfig5_directory, 'SFig5b_enrichment_analysis_Species_nonrarefied_',proj_prefix, '_', marker, '.svg', sep='')
+filename
+ggsave(filename,height = 7, width =10, units = 'in')
+
+```
+```{r}
+phylum_percentages_overall %>%
+  filter(Phylum == "Foraminifera")
+```
+
+Plot raw spp numbers (not done)
+```{r}
+plot_data_categorized <- bind_rows(
+  MiSeq_spp %>% mutate(DetectionGroup = "MiSeq_Unique"),
+  AVITI_spp %>% mutate(DetectionGroup = "AVITI_Unique"),
+  shared_spp %>% mutate(DetectionGroup = "Detected_by_Both")
+)
+
+# Calculate percentages for plotting across all three groups
+phylum_percentages_overall <- plot_data_categorized %>%
+  group_by(DetectionGroup, Phylum) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  group_by(DetectionGroup) %>%
+  mutate(Percentage = Count / sum(Count))
+
+# Determine which phyla are significant based on enrichment_results_unique_vs_common
+# A phylum is marked with '*' if either SequencerA_Unique_vs_Both or SequencerB_Unique_vs_Both is significant
+significant_phyla_for_plot <- enrichment_results_unique_vs_common %>%
+  filter(Adjusted_P_Value < 0.05) %>%
+  distinct(Phylum) %>%
+  mutate(Label = "*")
+
+# Merge significance labels into the plot data for correct positioning
+plot_data_with_significance <- phylum_percentages_overall %>%
+  left_join(significant_phyla_for_plot, by = "Phylum")
+
+# Find the maximum percentage for each phylum to position the asterisk
+max_percentage_per_phylum <- plot_data_with_significance %>%
+  group_by(Phylum) %>%
+  summarise(Max_Percentage = max(Percentage), .groups = 'drop')
+
+# Join max percentage back to the significance data for plotting
+significant_phyla_labels <- significant_phyla_for_plot %>%
+  left_join(max_percentage_per_phylum, by = "Phylum") %>%
+  mutate(Y_Position = Max_Percentage + 0.02) # Add a small offset above the bar
+
+
+# This bar plot helps visualize the phylum distribution for species
+# unique to each sequencer and those detected by both, as percentages.
+ggplot(plot_data_with_significance, aes(x = Phylum, y = Percentage, fill = DetectionGroup)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Phylum Distribution by Detection Group (Percentages)",
+       x = "Phylum",
+       y = "Percentage of Species",
+       fill = "Detection Group") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, max(plot_data_with_significance$Percentage) * 1.15)) + # Adjust y-axis limit
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  # Add asterisks for significant phyla
+  geom_text(data = significant_phyla_labels, aes(x = Phylum, y = Y_Position, label = Label),
+            inherit.aes = FALSE, size = 6, color = "black") +
+  # Add a small legend for the asterisk
+  annotate("text", x = Inf, y = Inf, label = "* Adjusted P-value < 0.05 (Unique vs. Common)",
+           hjust = 1.1, vjust = 1.1, size = 3, color = "black", fontface = "italic")
+```
+
+## ASVs in Phyla
+```{r}
+taxa_data_asv <- env_data %>% select(sample_name, ASV, reads, sequencer, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  # filter(grepl(paste(grep_search), sample_name)) %>%
+  filter(reads > 0) %>%
+  group_by(sequencer, ASV) %>%
+  mutate(sum_reads_asv = sum(reads)) %>%
+  ungroup() %>%
+  distinct(sequencer, ASV, .keep_all = T) %>%
+  mutate(present = case_when(sum_reads_asv > 0 ~ 1, T ~ 0)) %>% 
+  select(-sample_name, -reads, -sum_reads_asv) %>%
+  pivot_wider(names_from = "sequencer", values_from = "present", values_fill = 0) %>% arrange(ASV)
+
+shared_asv <- taxa_data_asv %>%
+  filter(MiSeq == 1 & AVITI == 1)
+
+
+MiSeq_asv <- taxa_data_asv %>%
+  filter(MiSeq == 1 & AVITI == 0)
+
+
+AVITI_asv <- taxa_data_asv %>%
+  filter(MiSeq == 0 & AVITI == 1)
+
+  
+  
+#comb_data <- make_comb_mat(data)
+
+# Display the number of unique species found by each sequencer
+cat("Number of unique ASVs detected by MiSeq:", nrow((MiSeq_asv)), "\n")
+cat("Number of unique ASVs detected by AVITI:", nrow(AVITI_asv), "\n")
+cat("Number of shared ASVs detected:", nrow(shared_asv), "\n")
+
+```
+
+```{r}
+# Create a combined dataset of ASVs unique to each sequencer
+# Add a column 'DetectionSource' to indicate which sequencer detected it uniquely
+all_unique_detections_asv <- bind_rows(
+  MiSeq_asv %>% mutate(DetectionSource = "MiSeq_Unique"),
+  AVITI_asv%>% mutate(DetectionSource = "AVITI_Unique")
+)
+
+# only keep phyla with at least 5 ASVs in at least 1 sequencer
+phylum_contingency_table_asv <- all_unique_detections_asv %>%
+  count(Phylum, DetectionSource) %>%
+  pivot_wider(names_from = DetectionSource, values_from = n, values_fill = 0) %>%
+  filter(if_any(c(MiSeq_Unique, AVITI_Unique), ~ . > 4))
+
+cat("\nContingency Table (Phylum vs. Unique Detection Source):\n")
+print(phylum_contingency_table_asv)
+
+```
+
+### Phylum-specific Enrichment Analysis (Unique vs. Common ASVs) 
+This section compares the phylum distribution of ASVs unique to each sequencer against the phylum distribution of ASVs detected by *both* sequencers.
+
+```{r}
+phyla_combined_asv <- unique(c(all_unique_detections_asv$Phylum, shared_asv$Phylum))
+filt_phyla_combined_asv <- unique(phylum_contingency_table_asv$Phylum)
+enrichment_results_unique_vs_common_asv <- data.frame(
+  Phylum = character(),
+  Comparison = character(), # e.g., "SequencerA_Unique_vs_Both", "SequencerB_Unique_vs_Both"
+  OddsRatio = numeric(),
+  P_Value = numeric(),
+  Adjusted_P_Value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+```
+
+```{r}
+for (phy in filt_phyla_combined_asv) {
+  # --- Comparison: SequencerA_Unique vs. ASV_Both ---
+  count_phy_A_unique <- sum(MiSeq_asv$Phylum == phy)
+  count_not_phy_A_unique <- sum(MiSeq_asv$Phylum != phy)
+  
+  count_phy_both <- sum(shared_asv$Phylum == phy)
+  count_not_phy_both <- sum(shared_asv$Phylum != phy)
+  
+  contingency_matrix_A_vs_Both <- matrix(c(count_phy_A_unique, count_not_phy_A_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("MiSeq_Unique", "ASV_Both")))
+  
+  if (sum(contingency_matrix_A_vs_Both) > 0) {
+    fisher_test_A_vs_Both <- fisher.test(contingency_matrix_A_vs_Both, alternative = "two.sided")
+    odds_ratio_A_vs_Both <- fisher_test_A_vs_Both$estimate
+    p_value_A_vs_Both <- fisher_test_A_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common_asv <- bind_rows(enrichment_results_unique_vs_common_asv, data.frame(
+      Phylum = phy,
+      Comparison = "MiSeq_Unique_vs_Both",
+      OddsRatio = odds_ratio_A_vs_Both,
+      P_Value = p_value_A_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Phylum '", phy, "' (A_Unique vs Both) due to no data.\n"))
+  }
+
+# --- Comparison: SequencerB_Unique vs. Species_Both ---
+  count_phy_B_unique <- sum(AVITI_asv$Phylum == phy)
+  count_not_phy_B_unique <- sum(AVITI_asv$Phylum != phy)
+  
+  contingency_matrix_B_vs_Both <- matrix(c(count_phy_B_unique, count_not_phy_B_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("AVITI_Unique", "ASV_Both")))
+  
+  if (sum(contingency_matrix_B_vs_Both) > 0) {
+    fisher_test_B_vs_Both <- fisher.test(contingency_matrix_B_vs_Both, alternative = "two.sided")
+    odds_ratio_B_vs_Both <- fisher_test_B_vs_Both$estimate
+    p_value_B_vs_Both <- fisher_test_B_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common_asv <- bind_rows(enrichment_results_unique_vs_common_asv, data.frame(
+      Phylum = phy,
+      Comparison = "AVITI_Unique_vs_Both",
+      OddsRatio = odds_ratio_B_vs_Both,
+      P_Value = p_value_B_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Phylum '", phy, "' (B_Unique vs Both) due to no data.\n"))
+  }
+}
+
+# Adjust p-values for multiple comparisons across all unique vs. common tests
+if (nrow(enrichment_results_unique_vs_common_asv) > 0) {
+  enrichment_results_unique_vs_common_asv$Adjusted_P_Value <- p.adjust(enrichment_results_unique_vs_common_asv$P_Value, method = "BH")
+  
+  cat("\nIndividual Phylum Enrichment Analysis Results (Unique vs. Common - Fisher's Exact Test):\n")
+  print(enrichment_results_unique_vs_common_asv %>% arrange(Adjusted_P_Value))
+  
+  cat("\nInterpretation of Individual Phylum Enrichment Analysis (Unique vs. Common):\n")
+  cat("- 'OddsRatio' > 1 for 'SequencerA_Unique_vs_Both' suggests enrichment in SequencerA_Unique relative to ASVs detected by both.\n")
+  cat("- 'OddsRatio' < 1 for 'SequencerA_Unique_vs_Both' suggests depletion in SequencerA_Unique relative to ASVs detected by both.\n")
+  cat("- Similar interpretation applies for 'SequencerB_Unique_vs_Both'.\n")
+  cat("- 'P_Value' indicates significance for that specific phylum and comparison.\n")
+  cat("- 'Adjusted_P_Value' accounts for multiple comparisons.\n")
+} else {
+  cat("\nNo phyla found for individual enrichment analysis (Unique vs. Common).\n")
+}
+```
+```{r}
+filename <- paste(enrichment_directory, proj_prefix, '_', marker, '_enrichment_results_uniqueASVs_in_Phyla.csv', sep='')
+write.csv(enrichment_results_unique_vs_common_asv %>% arrange(Adjusted_P_Value),filename,row.names = FALSE,quote = FALSE )
+```
+
+
+# ## S.FIG. 5C
+```{r}
+plot_data_categorized_asv <- bind_rows(
+  MiSeq_asv %>% mutate(DetectionGroup = "MiSeq_Unique"),
+  AVITI_asv %>% mutate(DetectionGroup = "AVITI_Unique"),
+  shared_asv %>% mutate(DetectionGroup = "Detected_by_Both")
+) %>% filter(Phylum %in% filt_phyla_combined_asv)
+
+# Calculate percentages for plotting across all three groups
+phylum_percentages_overall_asv <- plot_data_categorized_asv %>%
+  group_by(DetectionGroup, Phylum) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  group_by(DetectionGroup) %>%
+  mutate(Percentage = Count / sum(Count))
+
+# Determine which phyla are significant based on enrichment_results_unique_vs_common
+# A phylum is marked with '*' if either SequencerA_Unique_vs_Both or SequencerB_Unique_vs_Both is significant
+significant_phyla_for_plot <- enrichment_results_unique_vs_common_asv %>%
+  filter(Adjusted_P_Value < 0.05) %>%
+  distinct(Phylum) %>%
+  mutate(Label = "*")
+
+# Merge significance labels into the plot data for correct positioning
+plot_data_with_significance <- phylum_percentages_overall_asv %>%
+  left_join(significant_phyla_for_plot, by = "Phylum") %>%
+  filter(!is.na(Label))
+
+# Find the maximum percentage for each phylum to position the asterisk
+max_percentage_per_phylum <- plot_data_with_significance %>%
+  group_by(Phylum) %>%
+  summarise(Max_Percentage = max(Percentage), .groups = 'drop')
+
+# Join max percentage back to the significance data for plotting
+significant_phyla_labels <- significant_phyla_for_plot %>%
+  left_join(max_percentage_per_phylum, by = "Phylum") %>%
+  mutate(Y_Position = Max_Percentage + 0.02) # Add a small offset above the bar
+
+
+# This bar plot helps visualize the phylum distribution for species
+# unique to each sequencer and those detected by both, as percentages.
+ggplot(plot_data_with_significance, aes(x = Phylum, y = Percentage, fill = DetectionGroup)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Distribution of unique/shated ASVs by Phyl and Sequencer, Unrarefied",
+       x = "Phylum",
+       y = "Percentage of total ASVs in Group",
+       fill = "Group") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, max(plot_data_with_significance$Percentage) * 1.1)) + # Adjust y-axis limit
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1,size=15),
+        axis.text.y = element_text(size=15),
+        axis.title = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        legend.text = element_text(size = 15),
+        plot.title = element_text(size = 18)) +
+  # Add asterisks for significant phyla
+  geom_text(data = significant_phyla_labels, aes(x = Phylum, y = Y_Position, label = Label),
+            inherit.aes = FALSE, size = 6, color = "black") +
+  # Add a small legend for the asterisk
+  annotate("text", x = Inf, y = Inf, label = "* Adjusted P-value < 0.05 (Unique vs. Common)",
+           hjust = 1.1, vjust = 1.1, size = 5, color = "black", fontface = "italic")
+
+
+filename = paste(sfig5_directory, 'SFig5c_enrichment_analysis_ASVs_nonrarefied_',proj_prefix, '_', marker, '.png', sep='')
+filename
+ggsave(filename,height = 7, width =10, units = 'in')
+
+filename = paste(sfig5_directory, 'SFig5c_enrichment_analysis_ASVs_nonrarefied_',proj_prefix, '_', marker, '.svg', sep='')
+filename
+ggsave(filename,height = 7, width =10, units = 'in')
+
+
+```
+
+```{r}
+phylum_percentages_overall_asv %>%
+  filter(Phylum %in% significant_phyla_for_plot$Phylum) %>%
+  select(-Percentage) %>%
+  pivot_wider(names_from = DetectionGroup, values_from = Count)
+
+phylum_percentages_overall_asv%>%
+  filter(Phylum %in% significant_phyla_for_plot$Phylum) %>%
+  select(-Count) %>%
+  pivot_wider(names_from = DetectionGroup, values_from = Percentage)
+
+```
+
+## Unique taxa strings in Kingdom
+
+```{r}
+# Create a combined dataset of taxas unique to each sequencer
+
+king_contingency_table_uniq <- all_unique_detections_uniq %>%
+  count(Kingdom, DetectionSource) %>%
+  pivot_wider(names_from = DetectionSource, values_from = n, values_fill = 0) 
+
+cat("\nContingency Table (Kingdom vs. Unique Detection Source):\n")
+print(king_contingency_table_uniq)
+
+```
+
+### Kingdom-specific Enrichment Analysis (Unique vs. Common Taxa) 
+This section compares the kingdom distribution of taxas unique to each sequencer against the kingdom distribution of taxas detected by *both* sequencers.
+
+```{r}
+king_combined_uniq <- unique(c(all_unique_detections_uniq$Kingdom, shared_uniq$Kingdom))
+enrichment_results_unique_vs_common_uniq <- data.frame(
+  Kingdom = character(),
+  Comparison = character(), # e.g., "SequencerA_Unique_vs_Both", "SequencerB_Unique_vs_Both"
+  OddsRatio = numeric(),
+  P_Value = numeric(),
+  Adjusted_P_Value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+```
+
+```{r}
+for (phy in king_combined_uniq) {
+  # --- Comparison: SequencerA_Unique vs. ASV_Both ---
+  count_phy_A_unique <- sum(MiSeq_uniq$Kingdom == phy)
+  count_not_phy_A_unique <- sum(MiSeq_uniq$Kingdom != phy)
+  
+  count_phy_both <- sum(shared_uniq$Kingdom == phy)
+  count_not_phy_both <- sum(shared_uniq$Kingdom != phy)
+  
+  contingency_matrix_A_vs_Both <- matrix(c(count_phy_A_unique, count_not_phy_A_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("MiSeq_Unique", "Taxa_Both")))
+  
+  if (sum(contingency_matrix_A_vs_Both) > 0) {
+    fisher_test_A_vs_Both <- fisher.test(contingency_matrix_A_vs_Both, alternative = "two.sided")
+    odds_ratio_A_vs_Both <- fisher_test_A_vs_Both$estimate
+    p_value_A_vs_Both <- fisher_test_A_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common_uniq <- bind_rows(enrichment_results_unique_vs_common_uniq, data.frame(
+      Kingdom = phy,
+      Comparison = "MiSeq_Unique_vs_Both",
+      OddsRatio = odds_ratio_A_vs_Both,
+      P_Value = p_value_A_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Kingdom '", phy, "' (A_Unique vs Both) due to no data.\n"))
+  }
+
+# --- Comparison: SequencerB_Unique vs. Species_Both ---
+  count_phy_B_unique <- sum(AVITI_uniq$Kingdom == phy)
+  count_not_phy_B_unique <- sum(AVITI_uniq$Kingdom != phy)
+  
+  contingency_matrix_B_vs_Both <- matrix(c(count_phy_B_unique, count_not_phy_B_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("AVITI_Unique", "Taxa_Both")))
+  
+  if (sum(contingency_matrix_B_vs_Both) > 0) {
+    fisher_test_B_vs_Both <- fisher.test(contingency_matrix_B_vs_Both, alternative = "two.sided")
+    odds_ratio_B_vs_Both <- fisher_test_B_vs_Both$estimate
+    p_value_B_vs_Both <- fisher_test_B_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common_uniq <- bind_rows(enrichment_results_unique_vs_common_uniq, data.frame(
+      Kingdom = phy,
+      Comparison = "AVITI_Unique_vs_Both",
+      OddsRatio = odds_ratio_B_vs_Both,
+      P_Value = p_value_B_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Kingdom '", phy, "' (B_Unique vs Both) due to no data.\n"))
+  }
+}
+
+# Adjust p-values for multiple comparisons across all unique vs. common tests
+if (nrow(enrichment_results_unique_vs_common_uniq) > 0) {
+  enrichment_results_unique_vs_common_uniq$Adjusted_P_Value <- p.adjust(enrichment_results_unique_vs_common_uniq$P_Value, method = "BH")
+  
+  cat("\nIndividual Phylum Enrichment Analysis Results (Unique vs. Common - Fisher's Exact Test):\n")
+  print(enrichment_results_unique_vs_common_uniq %>% arrange(Adjusted_P_Value))
+  
+  cat("\nInterpretation of Individual Kingdom Enrichment Analysis (Unique vs. Common):\n")
+  cat("- 'OddsRatio' > 1 for 'SequencerA_Unique_vs_Both' suggests enrichment in SequencerA_Unique relative to Taxa detected by both.\n")
+  cat("- 'OddsRatio' < 1 for 'SequencerA_Unique_vs_Both' suggests depletion in SequencerA_Unique relative to Taxa detected by both.\n")
+  cat("- Similar interpretation applies for 'SequencerB_Unique_vs_Both'.\n")
+  cat("- 'P_Value' indicates significance for that specific phylum and comparison.\n")
+  cat("- 'Adjusted_P_Value' accounts for multiple comparisons.\n")
+} else {
+  cat("\nNo Kingdom found for individual enrichment analysis (Unique vs. Common).\n")
+}
+```
+```{r}
+plot_data_categorized_uniq <- bind_rows(
+  MiSeq_uniq %>% mutate(DetectionGroup = "MiSeq_Unique"),
+  AVITI_uniq %>% mutate(DetectionGroup = "AVITI_Unique"),
+  shared_uniq %>% mutate(DetectionGroup = "Detected_by_Both")
+)
+
+# Calculate percentages for plotting across all three groups
+king_percentages_overall_uniq <- plot_data_categorized_uniq %>%
+  group_by(DetectionGroup, Kingdom) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  group_by(DetectionGroup) %>%
+  mutate(Percentage = Count / sum(Count))
+
+# Determine which phyla are significant based on enrichment_results_unique_vs_common
+# A phylum is marked with '*' if either SequencerA_Unique_vs_Both or SequencerB_Unique_vs_Both is significant
+significant_king_for_plot <- enrichment_results_unique_vs_common_uniq %>%
+  filter(Adjusted_P_Value < 0.05) %>%
+  distinct(Kingdom) %>%
+  mutate(Label = "*")
+
+# Merge significance labels into the plot data for correct positioning
+plot_data_with_significance <- king_percentages_overall_uniq %>%
+  left_join(significant_king_for_plot, by = "Kingdom")
+
+# Find the maximum percentage for each phylum to position the asterisk
+max_percentage_per_king <- plot_data_with_significance %>%
+  group_by(Kingdom) %>%
+  summarise(Max_Percentage = max(Percentage), .groups = 'drop')
+
+# Join max percentage back to the significance data for plotting
+significant_king_labels <- significant_king_for_plot %>%
+  left_join(max_percentage_per_king, by = "Kingdom") %>%
+  mutate(Y_Position = Max_Percentage + 0.02) # Add a small offset above the bar
+
+
+# This bar plot helps visualize the phylum distribution for species
+# unique to each sequencer and those detected by both, as percentages.
+ggplot(plot_data_with_significance, aes(x = Kingdom, y = Percentage, fill = DetectionGroup)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Kingdom Distribution by Detection Group (Percentages)",
+       x = "Kingdom",
+       y = "Percentage of Taxa",
+       fill = "Detection Group") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, max(plot_data_with_significance$Percentage) * 1.1)) + # Adjust y-axis limit
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  # Add asterisks for significant phyla
+  geom_text(data = significant_king_labels, aes(x = Kingdom, y = Y_Position, label = Label),
+            inherit.aes = FALSE, size = 6, color = "black") +
+  # Add a small legend for the asterisk
+  annotate("text", x = Inf, y = Inf, label = "* Adjusted P-value < 0.05 (Unique vs. Common)",
+           hjust = 1.1, vjust = 1.1, size = 3, color = "black", fontface = "italic")
+```
+
+
+# Rarefied
+
+```{r}
+#ASV table
+#ASV table
+otu.c.rarefied <- read_csv(paste0(rarefaction_data, marker, "_Rarefied_data_OTU_table.csv"))
+head(otu.c.rarefied)
+
+
+#taxa table
+#taxa table
+tax.c.rarefied <- read_csv(paste0(rarefaction_data, marker, "_Rarefied_data_taxa_table.csv")) 
+head(tax.c.rarefied)
+
+
+#metadata table
+samp.c.rarefied <- read_csv(paste0(rarefaction_data, marker, "_Rarefied_data_metadata_table.csv"))  %>%
+  mutate(sample_source = fct_relevel(sample_source,  "CN23 MARS" , "MBTS 17024", "MBTS 20524", "MBTS 22624", "MBTS 25424", "CN24F 150m exp")) %>%
+  mutate(short_name = "") %>%
+  mutate(short_name = case_when(grepl("eDNA", sample_name) ~ substr(sample_name,1,nchar(sample_name)-9), T ~ short_name)) %>%
+  mutate(short_name = case_when(grepl("CN24F150", sample_name) ~ substr(sample_name,14,nchar(sample_name)-3), T ~ short_name))
+samp.c.rarefied
+  
+head(samp.c.rarefied)
+
+#OTU table long format with percent total reads
+potu.c.rarefied <- otu.c.rarefied %>%
+  tidyr::pivot_longer( -ASV, names_to ='sample_name',values_to = 'reads' ) %>%
+  ungroup() %>%
+  group_by(sample_name) %>%
+  mutate(per_tot = reads / sum(reads) *100) %>% #proportions(reads)*100
+  arrange(-reads)
+head(potu.c.rarefied)
+```
+
+
+## set lowest taxonomic annotation level for ASVs
+```{r}
+
+species_label <- tax.c.rarefied  %>%
+  # assign  algae
+  mutate(Phylum = case_when(Class == "Raphidophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Phaeophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Pelagophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Dictyochophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Chrysophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Synurophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Bolidophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Eustigmatophyceae" ~ "Ochrophyta", T ~ Phylum)) %>%
+  # assign oomycotes
+  mutate(Phylum = case_when(Class == "Oomycota" ~ "Oomycota", T ~ Phylum))  %>%
+  mutate(Phylum = case_when(Class == "Oomycetes" ~ "Oomycota", T ~ Phylum))%>%
+  # assign microeuk
+  mutate(Phylum = case_when(Class == "Bigyra" ~ "Bigyra", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Choanoflagellata" ~ "Choanoflagellata", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Cryptophyceae" ~ "Cryptista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Order == "Telonemida" ~ "Cryptista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Haptophyta" ~ "Haptista", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Centroplasthelida" ~ "Haptista", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Ichthyosporea" ~ "Choanozoa", T ~ Phylum))  %>% 
+  
+  mutate(Class = case_when(Phylum == "Imbricatea" ~ "Imbricatea", T ~ Class)) %>%
+  mutate(Phylum = case_when(Class == "Imbricatea" ~ "Cercozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Polycystinea" ~ "Retaria", T ~ Phylum)) %>%
+  mutate(Phylum = case_when(Class == "Acantharea" ~ "Retaria", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Breviatea" ~ "Sulcozoa", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Aphelidea" ~ "Aphelida", T ~ Phylum)) %>%
+  
+  mutate(Phylum = case_when(Class == "Filasterea" ~ "Choanozoa", T ~ Phylum)) %>%
+  
+  mutate(Kingdom = case_when(Kingdom %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Kingdom)) %>%
+  mutate(Phylum = case_when(Phylum %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Phylum)) %>% 
+  mutate(Class = case_when(Class %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Class)) %>% 
+  mutate(Order = case_when(Order %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Order)) %>% 
+  mutate(Family = case_when(Family %in% c("unknown", "unassigned", "no_hit") ~ "unknown", T ~ Family)) %>% 
+  mutate(Genus = case_when(Genus %in% c("unknown", "unassigned", "no_hit", "g_") ~ "unknown", T ~ Genus)) %>% 
+  mutate(Species = case_when(Species %in% c("unknown", "unassigned", "no_hit", "s_") ~ "unknown", T ~ Species))
+
+```
+
+
+```{r}
+# Compile data - 
+# environmental data
+env_data_rarefied <- inner_join(samp.c.rarefied, potu.c.rarefied, by = c("sample_name")) %>% 
+  left_join(species_label)
+head(env_data_rarefied)
+
+
+```
+
+
+## SHARED/UNIQUE Taxa
+
+```{r}
+length(unique(env_data_rarefied$Species))
+dim(env_data_rarefied %>% select(sample_name, ASV, reads, sequencer, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  # filter(grepl(paste(grep_search), sample_name)) %>%
+  filter(reads > 0))
+```
+
+## Unique taxa strings in Phyla
+```{r}
+taxa_data_unique <- env_data_rarefied %>% select(sample_name, ASV, reads, sequencer, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  filter(reads > 0) %>%
+  group_by(sequencer, Phylum, Class, Order, Family, Genus,Species) %>%
+  mutate(sum_reads_unique= sum(reads)) %>%
+  ungroup() %>%
+  distinct(sequencer, Phylum, Class, Order, Family, Genus, Species, .keep_all = T) %>%
+  mutate(present = case_when(sum_reads_unique> 0 ~ 1, T ~ 0)) %>% 
+  select(-ASV,-sample_name, -reads, -sum_reads_unique) %>%
+  pivot_wider(names_from = "sequencer", values_from = "present", values_fill = 0)
+
+shared_uniq_rare <- taxa_data_unique %>%
+  filter(MiSeq == 1 & AVITI == 1)
+
+
+MiSeq_uniq_rare <- taxa_data_unique %>%
+  filter(MiSeq == 1 & AVITI == 0)
+
+
+AVITI_uniq_rare <- taxa_data_unique %>%
+  filter(MiSeq == 0 & AVITI == 1)
+
+  
+  
+#comb_data <- make_comb_mat(data)
+
+# Display the number of unique species found by each sequencer
+cat("Number of unique taxa detected by MiSeq:", nrow((MiSeq_uniq_rare)), "\n")
+cat("Number of unique taxa detected by AVITI:", nrow(AVITI_uniq_rare), "\n")
+cat("Number of shared taxa detected:", nrow(shared_uniq_rare), "\n")
+
+```
+
+```{r}
+# Create a combined dataset of taxas unique to each sequencer
+# Add a column 'DetectionSource' to indicate which sequencer detected it uniquely
+all_unique_detections_uniq <- bind_rows(
+  MiSeq_uniq_rare %>% mutate(DetectionSource = "MiSeq_Unique"),
+  AVITI_uniq_rare%>% mutate(DetectionSource = "AVITI_Unique")
+)
+
+# only keep phyla with at least 5 ASVs in at least 1 sequencer
+phylum_contingency_table_uniq <- all_unique_detections_uniq %>%
+  count(Phylum, DetectionSource) %>%
+  pivot_wider(names_from = DetectionSource, values_from = n, values_fill = 0) 
+
+cat("\nContingency Table (Phylum vs. Unique Detection Source):\n")
+print(phylum_contingency_table_uniq)
+
+```
+
+### Phylum-specific Enrichment Analysis (Unique vs. Common Taxa), Rarefied 
+This section compares the phylum distribution of taxas unique to each sequencer against the phylum distribution of taxas detected by *both* sequencers.
+
+```{r}
+phyla_combined_uniq <- unique(c(all_unique_detections_uniq$Phylum, shared_uniq_rare$Phylum))
+enrichment_results_unique_vs_common_uniq <- data.frame(
+  Phylum = character(),
+  Comparison = character(), # e.g., "SequencerA_Unique_vs_Both", "SequencerB_Unique_vs_Both"
+  OddsRatio = numeric(),
+  P_Value = numeric(),
+  Adjusted_P_Value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+```
+
+```{r}
+for (phy in phyla_combined_uniq) {
+  # --- Comparison: SequencerA_Unique vs. ASV_Both ---
+  count_phy_A_unique <- sum(MiSeq_uniq_rare$Phylum == phy)
+  count_not_phy_A_unique <- sum(MiSeq_uniq_rare$Phylum != phy)
+  
+  count_phy_both <- sum(shared_uniq_rare$Phylum == phy)
+  count_not_phy_both <- sum(shared_uniq_rare$Phylum != phy)
+  
+  contingency_matrix_A_vs_Both <- matrix(c(count_phy_A_unique, count_not_phy_A_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("MiSeq_Unique", "Taxa_Both")))
+  
+  if (sum(contingency_matrix_A_vs_Both) > 0) {
+    fisher_test_A_vs_Both <- fisher.test(contingency_matrix_A_vs_Both, alternative = "two.sided")
+    odds_ratio_A_vs_Both <- fisher_test_A_vs_Both$estimate
+    p_value_A_vs_Both <- fisher_test_A_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common_uniq <- bind_rows(enrichment_results_unique_vs_common_uniq, data.frame(
+      Phylum = phy,
+      Comparison = "MiSeq_Unique_vs_Both",
+      OddsRatio = odds_ratio_A_vs_Both,
+      P_Value = p_value_A_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Phylum '", phy, "' (A_Unique vs Both) due to no data.\n"))
+  }
+
+# --- Comparison: SequencerB_Unique vs. Species_Both ---
+  count_phy_B_unique <- sum(AVITI_uniq_rare$Phylum == phy)
+  count_not_phy_B_unique <- sum(AVITI_uniq_rare$Phylum != phy)
+  
+  contingency_matrix_B_vs_Both <- matrix(c(count_phy_B_unique, count_not_phy_B_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("AVITI_Unique", "Taxa_Both")))
+  
+  if (sum(contingency_matrix_B_vs_Both) > 0) {
+    fisher_test_B_vs_Both <- fisher.test(contingency_matrix_B_vs_Both, alternative = "two.sided")
+    odds_ratio_B_vs_Both <- fisher_test_B_vs_Both$estimate
+    p_value_B_vs_Both <- fisher_test_B_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common_uniq <- bind_rows(enrichment_results_unique_vs_common_uniq, data.frame(
+      Phylum = phy,
+      Comparison = "AVITI_Unique_vs_Both",
+      OddsRatio = odds_ratio_B_vs_Both,
+      P_Value = p_value_B_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Phylum '", phy, "' (B_Unique vs Both) due to no data.\n"))
+  }
+}
+
+# Adjust p-values for multiple comparisons across all unique vs. common tests
+if (nrow(enrichment_results_unique_vs_common_uniq) > 0) {
+  enrichment_results_unique_vs_common_uniq$Adjusted_P_Value <- p.adjust(enrichment_results_unique_vs_common_uniq$P_Value, method = "BH")
+  
+  cat("\nIndividual Phylum Enrichment Analysis Results (Unique vs. Common - Fisher's Exact Test):\n")
+  print(enrichment_results_unique_vs_common_uniq %>% arrange(Adjusted_P_Value))
+  
+  cat("\nInterpretation of Individual Phylum Enrichment Analysis (Unique vs. Common):\n")
+  cat("- 'OddsRatio' > 1 for 'SequencerA_Unique_vs_Both' suggests enrichment in SequencerA_Unique relative to Taxa detected by both.\n")
+  cat("- 'OddsRatio' < 1 for 'SequencerA_Unique_vs_Both' suggests depletion in SequencerA_Unique relative to Taxa detected by both.\n")
+  cat("- Similar interpretation applies for 'SequencerB_Unique_vs_Both'.\n")
+  cat("- 'P_Value' indicates significance for that specific phylum and comparison.\n")
+  cat("- 'Adjusted_P_Value' accounts for multiple comparisons.\n")
+} else {
+  cat("\nNo phyla found for individual enrichment analysis (Unique vs. Common).\n")
+}
+```
+```{r}
+filename <- paste(enrichment_directory, proj_prefix, '_', marker, '_Rarefied_enrichment_results_uniqueTaxa_in_Phyla.csv', sep='')
+write.csv(enrichment_results_unique_vs_common_uniq %>% arrange(Adjusted_P_Value),filename,row.names = FALSE,quote = FALSE )
+```
+
+# ## S.Fig. 5D
+```{r}
+plot_data_categorized_uniq <- bind_rows(
+  MiSeq_uniq_rare %>% mutate(DetectionGroup = "MiSeq_Unique"),
+  AVITI_uniq_rare %>% mutate(DetectionGroup = "AVITI_Unique"),
+  shared_uniq_rare %>% mutate(DetectionGroup = "Detected_by_Both")
+)
+
+# Calculate percentages for plotting across all three groups
+phylum_percentages_overall_uniq <- plot_data_categorized_uniq %>%
+  group_by(DetectionGroup, Phylum) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  group_by(DetectionGroup) %>%
+  mutate(Percentage = Count / sum(Count))
+
+# Determine which phyla are significant based on enrichment_results_unique_vs_common
+# A phylum is marked with '*' if either SequencerA_Unique_vs_Both or SequencerB_Unique_vs_Both is significant
+significant_phyla_for_plot <- enrichment_results_unique_vs_common_uniq %>%
+  filter(Adjusted_P_Value < 0.05) %>%
+  distinct(Phylum) %>%
+  mutate(Label = "*")
+
+# Merge significance labels into the plot data for correct positioning
+plot_data_with_significance <- phylum_percentages_overall_uniq %>%
+  left_join(significant_phyla_for_plot, by = "Phylum") %>%
+  filter(!is.na(Label))
+
+# Find the maximum percentage for each phylum to position the asterisk
+max_percentage_per_phylum <- plot_data_with_significance %>%
+  group_by(Phylum) %>%
+  summarise(Max_Percentage = max(Percentage), .groups = 'drop')
+
+# Join max percentage back to the significance data for plotting
+significant_phyla_labels <- significant_phyla_for_plot %>%
+  left_join(max_percentage_per_phylum, by = "Phylum") %>%
+  mutate(Y_Position = Max_Percentage + 0.02) # Add a small offset above the bar
+
+
+# This bar plot helps visualize the phylum distribution for species
+# unique to each sequencer and those detected by both, as percentages.
+ggplot(plot_data_with_significance, aes(x = Phylum, y = Percentage, fill = DetectionGroup)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Distribution of Uniques/Shared Taxa by Phyla and Sequencer, Rarefied",
+       x = "Phylum",
+       y = "Percentage of Total Taxa in Group",
+       fill = "Group") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, max(plot_data_with_significance$Percentage) * 1.1)) + # Adjust y-axis limit
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1,size=15),
+        axis.text.y = element_text(size=15),
+        axis.title = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        legend.text = element_text(size = 15),
+        plot.title = element_text(size = 18)) +
+  # Add asterisks for significant phyla
+  geom_text(data = significant_phyla_labels, aes(x = Phylum, y = Y_Position, label = Label),
+            inherit.aes = FALSE, size = 6, color = "black") +
+  # Add a small legend for the asterisk
+  annotate("text", x = Inf, y = Inf, label = "* Adjusted P-value < 0.05 (Unique vs. Common)",
+           hjust = 1.1, vjust = 1.1, size = 5, color = "black", fontface = "italic")
+
+
+
+filename = paste(sfig5_directory, 'SFig5d_enrichment_analysis_taxa_rarefied_',proj_prefix, '_', marker, '.png', sep='')
+filename
+ggsave(filename,height = 7, width =10, units = 'in')
+
+filename = paste(sfig5_directory, 'SFig5d_enrichment_analysis_taxa_rarefied_',proj_prefix, '_', marker, '.svg', sep='')
+filename
+ggsave(filename,height = 7, width =10, units = 'in')
+
+
+
+```
+```{r}
+phylum_percentages_overall_uniq %>%
+  filter(Phylum %in% significant_phyla_for_plot$Phylum) %>%
+  select(-Percentage) %>%
+  pivot_wider(names_from = DetectionGroup, values_from = Count)
+
+phylum_percentages_overall_uniq %>%
+  filter(Phylum %in% significant_phyla_for_plot$Phylum) %>%
+  select(-Count) %>%
+  pivot_wider(names_from = DetectionGroup, values_from = Percentage)
+
+```
+
+## Species in Phyla, Rarefied. 
+```{r}
+taxa_data_spp <- env_data_rarefied %>% select(sample_name, ASV, reads, sequencer, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  # filter(grepl(paste(grep_search), sample_name)) %>%
+  filter(reads > 0) %>%
+  group_by(sequencer, Species) %>%
+  mutate(sum_reads_spp = sum(reads)) %>%
+  ungroup() %>%
+  distinct(sequencer, Species, .keep_all = T) %>%
+  mutate(present = case_when(sum_reads_spp > 0 ~ 1, T ~ 0)) %>% 
+  select(-ASV,-sample_name, -reads, -sum_reads_spp) %>%
+  pivot_wider(names_from = "sequencer", values_from = "present", values_fill = 0) %>% arrange(Species)
+
+shared_spp_rare <- taxa_data_spp %>%
+  filter(MiSeq == 1 & AVITI == 1)
+
+
+MiSeq_spp_rare <- taxa_data_spp %>%
+  filter(MiSeq == 1 & AVITI == 0)
+
+
+AVITI_spp_rare <- taxa_data_spp %>%
+  filter(MiSeq == 0 & AVITI == 1)
+
+  
+  
+#comb_data <- make_comb_mat(data)
+
+# Display the number of unique species found by each sequencer
+cat("Number of unique species detected by MiSeq, Rarefied:", nrow((MiSeq_spp_rare)), "\n")
+cat("Number of unique species detected by AVITI, Rarefied:", nrow(AVITI_spp_rare), "\n")
+cat("Number of shared species detected, Rarefied:", nrow(shared_spp_rare), "\n")
+
+```
+
+```{r}
+# Create a combined dataset of species unique to each sequencer
+# Add a column 'DetectionSource' to indicate which sequencer detected it uniquely
+all_unique_detections <- bind_rows(
+  MiSeq_spp_rare %>% mutate(DetectionSource = "MiSeq_Unique"),
+  AVITI_spp_rare%>% mutate(DetectionSource = "AVITI_Unique")
+)
+
+phylum_contingency_table <- all_unique_detections %>%
+  count(Phylum, DetectionSource) %>%
+  pivot_wider(names_from = DetectionSource, values_from = n, values_fill = 0)
+
+cat("\nContingency Table (Phylum vs. Unique Detection Source):\n")
+print(phylum_contingency_table)
+
+```
+
+### Phylum-specific Enrichment Analysis (Unique vs. Common Species), Rarefied 
+This section compares the phylum distribution of species unique to each sequencer against the phylum distribution of species detected by *both* sequencers.
+
+```{r}
+all_phyla_combined <- unique(c(all_unique_detections$Phylum, shared_spp_rare$Phylum))
+enrichment_results_unique_vs_common <- data.frame(
+  Phylum = character(),
+  Comparison = character(), # e.g., "SequencerA_Unique_vs_Both", "SequencerB_Unique_vs_Both"
+  OddsRatio = numeric(),
+  P_Value = numeric(),
+  Adjusted_P_Value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+```
+
+```{r}
+for (phy in all_phyla_combined) {
+  # --- Comparison: SequencerA_Unique vs. Species_Both ---
+  count_phy_A_unique <- sum(MiSeq_spp_rare$Phylum == phy)
+  count_not_phy_A_unique <- sum(MiSeq_spp_rare$Phylum != phy)
+  
+  count_phy_both <- sum(shared_spp_rare$Phylum == phy)
+  count_not_phy_both <- sum(shared_spp_rare$Phylum != phy)
+  
+  contingency_matrix_A_vs_Both <- matrix(c(count_phy_A_unique, count_not_phy_A_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("MiSeq_Unique", "Species_Both")))
+  
+  if (sum(contingency_matrix_A_vs_Both) > 0) {
+    fisher_test_A_vs_Both <- fisher.test(contingency_matrix_A_vs_Both, alternative = "two.sided")
+    odds_ratio_A_vs_Both <- fisher_test_A_vs_Both$estimate
+    p_value_A_vs_Both <- fisher_test_A_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common <- bind_rows(enrichment_results_unique_vs_common, data.frame(
+      Phylum = phy,
+      Comparison = "MiSeq_Unique_vs_Both",
+      OddsRatio = odds_ratio_A_vs_Both,
+      P_Value = p_value_A_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Phylum '", phy, "' (A_Unique vs Both) due to no data.\n"))
+  }
+
+# --- Comparison: SequencerB_Unique vs. Species_Both ---
+  count_phy_B_unique <- sum(AVITI_spp_rare$Phylum == phy)
+  count_not_phy_B_unique <- sum(AVITI_spp_rare$Phylum != phy)
+  
+  contingency_matrix_B_vs_Both <- matrix(c(count_phy_B_unique, count_not_phy_B_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("AVITI_Unique", "Species_Both")))
+  
+  if (sum(contingency_matrix_B_vs_Both) > 0) {
+    fisher_test_B_vs_Both <- fisher.test(contingency_matrix_B_vs_Both, alternative = "two.sided")
+    odds_ratio_B_vs_Both <- fisher_test_B_vs_Both$estimate
+    p_value_B_vs_Both <- fisher_test_B_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common <- bind_rows(enrichment_results_unique_vs_common, data.frame(
+      Phylum = phy,
+      Comparison = "AVITI_Unique_vs_Both",
+      OddsRatio = odds_ratio_B_vs_Both,
+      P_Value = p_value_B_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Phylum '", phy, "' (B_Unique vs Both) due to no data.\n"))
+  }
+}
+
+# Adjust p-values for multiple comparisons across all unique vs. common tests
+if (nrow(enrichment_results_unique_vs_common) > 0) {
+  enrichment_results_unique_vs_common$Adjusted_P_Value <- p.adjust(enrichment_results_unique_vs_common$P_Value, method = "BH")
+  
+  cat("\nIndividual Phylum Enrichment Analysis Results (Unique vs. Common - Fisher's Exact Test):\n")
+  print(enrichment_results_unique_vs_common %>% arrange(Adjusted_P_Value))
+  
+  cat("\nInterpretation of Individual Phylum Enrichment Analysis (Unique vs. Common):\n")
+  cat("- 'OddsRatio' > 1 for 'SequencerA_Unique_vs_Both' suggests enrichment in SequencerA_Unique relative to species detected by both.\n")
+  cat("- 'OddsRatio' < 1 for 'SequencerA_Unique_vs_Both' suggests depletion in SequencerA_Unique relative to species detected by both.\n")
+  cat("- Similar interpretation applies for 'SequencerB_Unique_vs_Both'.\n")
+  cat("- 'P_Value' indicates significance for that specific phylum and comparison.\n")
+  cat("- 'Adjusted_P_Value' accounts for multiple comparisons.\n")
+} else {
+  cat("\nNo phyla found for individual enrichment analysis (Unique vs. Common).\n")
+}
+```
+```{r}
+filename <- paste(enrichment_directory, proj_prefix, '_', marker, '_Rarefied_enrichment_results_uniqueSpp_in_Phyla.csv', sep='')
+write.csv(enrichment_results_unique_vs_common %>% arrange(Adjusted_P_Value),filename,row.names = FALSE,quote = FALSE )
+```
+
+# ## S.FIG 5E
+```{r}
+plot_data_categorized <- bind_rows(
+  MiSeq_spp_rare %>% mutate(DetectionGroup = "MiSeq_Unique"),
+  AVITI_spp_rare %>% mutate(DetectionGroup = "AVITI_Unique"),
+  shared_spp_rare %>% mutate(DetectionGroup = "Detected_by_Both")
+)
+
+# Calculate percentages for plotting across all three groups
+phylum_percentages_overall <- plot_data_categorized %>%
+  group_by(DetectionGroup, Phylum) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  group_by(DetectionGroup) %>%
+  mutate(Percentage = Count / sum(Count))
+
+# Determine which phyla are significant based on enrichment_results_unique_vs_common
+# A phylum is marked with '*' if either SequencerA_Unique_vs_Both or SequencerB_Unique_vs_Both is significant
+significant_phyla_for_plot <- enrichment_results_unique_vs_common %>%
+  filter(Adjusted_P_Value < 0.05) %>%
+  distinct(Phylum) %>%
+  mutate(Label = "*")
+
+# Merge significance labels into the plot data for correct positioning
+plot_data_with_significance <- phylum_percentages_overall %>%
+  left_join(significant_phyla_for_plot, by = "Phylum") %>%
+  filter(!is.na(Label))
+
+# Find the maximum percentage for each phylum to position the asterisk
+max_percentage_per_phylum <- plot_data_with_significance %>%
+  group_by(Phylum) %>%
+  summarise(Max_Percentage = max(Percentage), .groups = 'drop')
+
+# Join max percentage back to the significance data for plotting
+significant_phyla_labels <- significant_phyla_for_plot %>%
+  left_join(max_percentage_per_phylum, by = "Phylum") %>%
+  mutate(Y_Position = Max_Percentage + 0.02) # Add a small offset above the bar
+
+
+# This bar plot helps visualize the phylum distribution for species
+# unique to each sequencer and those detected by both, as percentages.
+ggplot(plot_data_with_significance, aes(x = Phylum, y = Percentage, fill = DetectionGroup)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Distribution of unique/shared species by Phyla and Sequencer, Rarefied",
+       x = "Phylum",
+       y = "Percentage of Total Species in Group",
+       fill = "Group") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, max(plot_data_with_significance$Percentage) * 1.15)) + # Adjust y-axis limit
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1,size=15),
+        axis.text.y = element_text(size=15),
+        axis.title = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        legend.text = element_text(size = 15),
+        plot.title = element_text(size = 18)) +
+  # Add asterisks for significant phyla
+  geom_text(data = significant_phyla_labels, aes(x = Phylum, y = Y_Position, label = Label),
+            inherit.aes = FALSE, size = 6, color = "black") +
+  # Add a small legend for the asterisk
+  annotate("text", x = Inf, y = Inf, label = "* Adjusted P-value < 0.05 (Unique vs. Common)",
+           hjust = 1.1, vjust = 1.1, size = 5, color = "black", fontface = "italic")
+
+
+
+filename = paste(sfig5_directory, 'SFig5e_enrichment_analysis_species_rarefied_',proj_prefix, '_', marker, '.png', sep='')
+filename
+ggsave(filename,height = 7, width =10, units = 'in')
+
+filename = paste(sfig5_directory, 'SFig5e_enrichment_analysis_species_rarefied_',proj_prefix, '_', marker, '.svg', sep='')
+filename
+ggsave(filename,height = 7, width =10, units = 'in')
+
+
+```
+```{r}
+phylum_percentages_overall %>%
+  filter(Phylum == "Foraminifera")
+```
+
+Plot raw spp numbers (not done)
+```{r}
+plot_data_categorized <- bind_rows(
+  MiSeq_spp %>% mutate(DetectionGroup = "MiSeq_Unique"),
+  AVITI_spp %>% mutate(DetectionGroup = "AVITI_Unique"),
+  shared_spp %>% mutate(DetectionGroup = "Detected_by_Both")
+)
+
+# Calculate percentages for plotting across all three groups
+phylum_percentages_overall <- plot_data_categorized %>%
+  group_by(DetectionGroup, Phylum) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  group_by(DetectionGroup) %>%
+  mutate(Percentage = Count / sum(Count))
+
+# Determine which phyla are significant based on enrichment_results_unique_vs_common
+# A phylum is marked with '*' if either SequencerA_Unique_vs_Both or SequencerB_Unique_vs_Both is significant
+significant_phyla_for_plot <- enrichment_results_unique_vs_common %>%
+  filter(Adjusted_P_Value < 0.05) %>%
+  distinct(Phylum) %>%
+  mutate(Label = "*")
+
+# Merge significance labels into the plot data for correct positioning
+plot_data_with_significance <- phylum_percentages_overall %>%
+  left_join(significant_phyla_for_plot, by = "Phylum")
+
+# Find the maximum percentage for each phylum to position the asterisk
+max_percentage_per_phylum <- plot_data_with_significance %>%
+  group_by(Phylum) %>%
+  summarise(Max_Percentage = max(Percentage), .groups = 'drop')
+
+# Join max percentage back to the significance data for plotting
+significant_phyla_labels <- significant_phyla_for_plot %>%
+  left_join(max_percentage_per_phylum, by = "Phylum") %>%
+  mutate(Y_Position = Max_Percentage + 0.02) # Add a small offset above the bar
+
+
+# This bar plot helps visualize the phylum distribution for species
+# unique to each sequencer and those detected by both, as percentages.
+ggplot(plot_data_with_significance, aes(x = Phylum, y = Percentage, fill = DetectionGroup)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Phylum Distribution by Detection Group (Percentages)",
+       x = "Phylum",
+       y = "Percentage of Species",
+       fill = "Detection Group") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, max(plot_data_with_significance$Percentage) * 1.15)) + # Adjust y-axis limit
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  # Add asterisks for significant phyla
+  geom_text(data = significant_phyla_labels, aes(x = Phylum, y = Y_Position, label = Label),
+            inherit.aes = FALSE, size = 6, color = "black") +
+  # Add a small legend for the asterisk
+  annotate("text", x = Inf, y = Inf, label = "* Adjusted P-value < 0.05 (Unique vs. Common)",
+           hjust = 1.1, vjust = 1.1, size = 3, color = "black", fontface = "italic")
+```
+
+## ASVs in Phyla
+```{r}
+taxa_data_asv <- env_data_rarefied %>% select(sample_name, ASV, reads, sequencer, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  # filter(grepl(paste(grep_search), sample_name)) %>%
+  filter(reads > 0) %>%
+  group_by(sequencer, ASV) %>%
+  mutate(sum_reads_asv = sum(reads)) %>%
+  ungroup() %>%
+  distinct(sequencer, ASV, .keep_all = T) %>%
+  mutate(present = case_when(sum_reads_asv > 0 ~ 1, T ~ 0)) %>% 
+  select(-sample_name, -reads, -sum_reads_asv) %>%
+  pivot_wider(names_from = "sequencer", values_from = "present", values_fill = 0) %>% arrange(ASV)
+
+shared_asv_rare <- taxa_data_asv %>%
+  filter(MiSeq == 1 & AVITI == 1)
+
+
+MiSeq_asv_rare <- taxa_data_asv %>%
+  filter(MiSeq == 1 & AVITI == 0)
+
+
+AVITI_asv_rare <- taxa_data_asv %>%
+  filter(MiSeq == 0 & AVITI == 1)
+
+  
+  
+#comb_data <- make_comb_mat(data)
+
+# Display the number of unique species found by each sequencer
+cat("Number of unique ASVs detected by MiSeq, Rarefied:", nrow((MiSeq_asv_rare)), "\n")
+cat("Number of unique ASVs detected by AVITI, Rarefied:", nrow(AVITI_asv_rare), "\n")
+cat("Number of shared ASVs detected, Rarefied:", nrow(shared_asv_rare), "\n")
+
+```
+
+```{r}
+# Create a combined dataset of ASVs unique to each sequencer
+# Add a column 'DetectionSource' to indicate which sequencer detected it uniquely
+all_unique_detections_asv <- bind_rows(
+  MiSeq_asv_rare %>% mutate(DetectionSource = "MiSeq_Unique"),
+  AVITI_asv_rare%>% mutate(DetectionSource = "AVITI_Unique")
+)
+
+# only keep phyla with at least 5 ASVs in at least 1 sequencer
+phylum_contingency_table_asv <- all_unique_detections_asv %>%
+  count(Phylum, DetectionSource) %>%
+  pivot_wider(names_from = DetectionSource, values_from = n, values_fill = 0) %>%
+  filter(if_any(c(MiSeq_Unique, AVITI_Unique), ~ . > 4))
+
+cat("\nContingency Table (Phylum vs. Unique Detection Source):\n")
+print(phylum_contingency_table_asv)
+
+```
+
+### Phylum-specific Enrichment Analysis (Unique vs. Common ASVs) 
+This section compares the phylum distribution of ASVs unique to each sequencer against the phylum distribution of ASVs detected by *both* sequencers.
+
+```{r}
+phyla_combined_asv <- unique(c(all_unique_detections_asv$Phylum, shared_asv_rare$Phylum))
+filt_phyla_combined_asv <- unique(phylum_contingency_table_asv$Phylum)
+enrichment_results_unique_vs_common_asv <- data.frame(
+  Phylum = character(),
+  Comparison = character(), # e.g., "SequencerA_Unique_vs_Both", "SequencerB_Unique_vs_Both"
+  OddsRatio = numeric(),
+  P_Value = numeric(),
+  Adjusted_P_Value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+```
+
+```{r}
+for (phy in filt_phyla_combined_asv) {
+  # --- Comparison: SequencerA_Unique vs. ASV_Both ---
+  count_phy_A_unique <- sum(MiSeq_asv_rare$Phylum == phy)
+  count_not_phy_A_unique <- sum(MiSeq_asv_rare$Phylum != phy)
+  
+  count_phy_both <- sum(shared_asv_rare$Phylum == phy)
+  count_not_phy_both <- sum(shared_asv_rare$Phylum != phy)
+  
+  contingency_matrix_A_vs_Both <- matrix(c(count_phy_A_unique, count_not_phy_A_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("MiSeq_Unique", "ASV_Both")))
+  
+  if (sum(contingency_matrix_A_vs_Both) > 0) {
+    fisher_test_A_vs_Both <- fisher.test(contingency_matrix_A_vs_Both, alternative = "two.sided")
+    odds_ratio_A_vs_Both <- fisher_test_A_vs_Both$estimate
+    p_value_A_vs_Both <- fisher_test_A_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common_asv <- bind_rows(enrichment_results_unique_vs_common_asv, data.frame(
+      Phylum = phy,
+      Comparison = "MiSeq_Unique_vs_Both",
+      OddsRatio = odds_ratio_A_vs_Both,
+      P_Value = p_value_A_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Phylum '", phy, "' (A_Unique vs Both) due to no data.\n"))
+  }
+
+# --- Comparison: SequencerB_Unique vs. Species_Both ---
+  count_phy_B_unique <- sum(AVITI_asv_rare$Phylum == phy)
+  count_not_phy_B_unique <- sum(AVITI_asv_rare$Phylum != phy)
+  
+  contingency_matrix_B_vs_Both <- matrix(c(count_phy_B_unique, count_not_phy_B_unique,
+                                           count_phy_both, count_not_phy_both),
+                                         nrow = 2, byrow = FALSE,
+                                         dimnames = list(c(phy, paste0("Not_", phy)),
+                                                         c("AVITI_Unique", "ASV_Both")))
+  
+  if (sum(contingency_matrix_B_vs_Both) > 0) {
+    fisher_test_B_vs_Both <- fisher.test(contingency_matrix_B_vs_Both, alternative = "two.sided")
+    odds_ratio_B_vs_Both <- fisher_test_B_vs_Both$estimate
+    p_value_B_vs_Both <- fisher_test_B_vs_Both$p.value
+    
+    enrichment_results_unique_vs_common_asv <- bind_rows(enrichment_results_unique_vs_common_asv, data.frame(
+      Phylum = phy,
+      Comparison = "AVITI_Unique_vs_Both",
+      OddsRatio = odds_ratio_B_vs_Both,
+      P_Value = p_value_B_vs_Both
+    ))
+  } else {
+    cat(paste0("Skipping Fisher's test for Phylum '", phy, "' (B_Unique vs Both) due to no data.\n"))
+  }
+}
+
+# Adjust p-values for multiple comparisons across all unique vs. common tests
+if (nrow(enrichment_results_unique_vs_common_asv) > 0) {
+  enrichment_results_unique_vs_common_asv$Adjusted_P_Value <- p.adjust(enrichment_results_unique_vs_common_asv$P_Value, method = "BH")
+  
+  cat("\nIndividual Phylum Enrichment Analysis Results (Unique vs. Common - Fisher's Exact Test):\n")
+  print(enrichment_results_unique_vs_common_asv %>% arrange(Adjusted_P_Value))
+  
+  cat("\nInterpretation of Individual Phylum Enrichment Analysis (Unique vs. Common):\n")
+  cat("- 'OddsRatio' > 1 for 'SequencerA_Unique_vs_Both' suggests enrichment in SequencerA_Unique relative to ASVs detected by both.\n")
+  cat("- 'OddsRatio' < 1 for 'SequencerA_Unique_vs_Both' suggests depletion in SequencerA_Unique relative to ASVs detected by both.\n")
+  cat("- Similar interpretation applies for 'SequencerB_Unique_vs_Both'.\n")
+  cat("- 'P_Value' indicates significance for that specific phylum and comparison.\n")
+  cat("- 'Adjusted_P_Value' accounts for multiple comparisons.\n")
+} else {
+  cat("\nNo phyla found for individual enrichment analysis (Unique vs. Common).\n")
+}
+```
+```{r}
+filename <- paste(enrichment_directory,  proj_prefix, '_', marker, '_Rarefied_enrichment_results_uniqueASVs_in_Phyla.csv', sep='')
+write.csv(enrichment_results_unique_vs_common_asv %>% arrange(Adjusted_P_Value),filename,row.names = FALSE,quote = FALSE )
+```
+
+# ## S.FIG 5F
+```{r}
+plot_data_categorized_asv <- bind_rows(
+  MiSeq_asv_rare %>% mutate(DetectionGroup = "MiSeq_Unique"),
+  AVITI_asv_rare %>% mutate(DetectionGroup = "AVITI_Unique"),
+  shared_asv_rare %>% mutate(DetectionGroup = "Detected_by_Both")
+) %>% filter(Phylum %in% filt_phyla_combined_asv)
+
+# Calculate percentages for plotting across all three groups
+phylum_percentages_overall_asv <- plot_data_categorized_asv %>%
+  group_by(DetectionGroup, Phylum) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  group_by(DetectionGroup) %>%
+  mutate(Percentage = Count / sum(Count))
+
+# Determine which phyla are significant based on enrichment_results_unique_vs_common
+# A phylum is marked with '*' if either SequencerA_Unique_vs_Both or SequencerB_Unique_vs_Both is significant
+significant_phyla_for_plot <- enrichment_results_unique_vs_common_asv %>%
+  filter(Adjusted_P_Value < 0.05) %>%
+  distinct(Phylum) %>%
+  mutate(Label = "*")
+
+# Merge significance labels into the plot data for correct positioning
+plot_data_with_significance <- phylum_percentages_overall_asv %>%
+  left_join(significant_phyla_for_plot, by = "Phylum") %>% 
+  filter(!is.na(Label))
+
+# Find the maximum percentage for each phylum to position the asterisk
+max_percentage_per_phylum <- plot_data_with_significance %>%
+  group_by(Phylum) %>%
+  summarise(Max_Percentage = max(Percentage), .groups = 'drop')
+
+# Join max percentage back to the significance data for plotting
+significant_phyla_labels <- significant_phyla_for_plot %>%
+  left_join(max_percentage_per_phylum, by = "Phylum") %>%
+  mutate(Y_Position = Max_Percentage + 0.02) # Add a small offset above the bar
+
+
+# This bar plot helps visualize the phylum distribution for species
+# unique to each sequencer and those detected by both, as percentages.
+ggplot(plot_data_with_significance, aes(x = Phylum, y = Percentage, fill = DetectionGroup)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Distribution of unique/shared ASVs by Sequencer and Phyla",
+       x = "Phylum",
+       y = "Percentage of Total ASVs in Group",
+       fill = "Group") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, max(plot_data_with_significance$Percentage) * 1.1)) + # Adjust y-axis limit
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1,size=15),
+        axis.text.y = element_text(size=15),
+        axis.title = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        legend.text = element_text(size = 15),
+        plot.title = element_text(size = 18)) +
+  # Add asterisks for significant phyla
+  geom_text(data = significant_phyla_labels, aes(x = Phylum, y = Y_Position, label = Label),
+            inherit.aes = FALSE, size = 6, color = "black") +
+  # Add a small legend for the asterisk
+  annotate("text", x = Inf, y = Inf, label = "* Adjusted P-value < 0.05 (Unique vs. Common)",
+           hjust = 1.1, vjust = 1.1, size = 5, color = "black", fontface = "italic")
+
+
+
+filename = paste(sfig5_directory, 'SFig5f_enrichment_analysis_ASVs_rarefied_',proj_prefix, '_', marker, '.png', sep='')
+filename
+ggsave(filename,height = 7, width =10, units = 'in')
+
+filename = paste(sfig5_directory, 'SFig5f_enrichment_analysis_ASVs_rarefied_',proj_prefix, '_', marker, '.svg', sep='')
+filename
+ggsave(filename,height = 7, width =10, units = 'in')
+
+
+
+```
+
+```{r}
+phylum_percentages_overall_asv %>%
+  filter(Phylum %in% significant_phyla_for_plot$Phylum) %>%
+  select(-Percentage) %>%
+  pivot_wider(names_from = DetectionGroup, values_from = Count)
+
+phylum_percentages_overall_asv%>%
+  filter(Phylum %in% significant_phyla_for_plot$Phylum) %>%
+  select(-Count) %>%
+  pivot_wider(names_from = DetectionGroup, values_from = Percentage)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
