@@ -313,9 +313,9 @@ p2 <- upset(
   base_annotations=list(
     'Number of unique taxa'=intersection_size(
       counts=TRUE, 
-      mapping=aes(fill=full_tax),
+      mapping=aes(fill=reorder(full_tax, seq_taxa_per_tot_2)),
       text=list(check_overlap=TRUE, size = 8),
-    ) + scale_fill_manual(values = large_color_palette_cal, guide='none') +
+    ) + scale_fill_manual(values = large_color_palette_cal, guide='none') + 
       theme(
         axis.text.y = element_text(size = 16),
         axis.title = element_text(size = 20, face = "bold")
