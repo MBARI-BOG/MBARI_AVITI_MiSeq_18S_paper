@@ -263,11 +263,19 @@ updated3 <- long_dat_pres_taxa %>%
   mutate(full_tax = case_when(top_20_spp == "no" ~ paste0("(not top 28 Phyla)"),
                               TRUE ~ full_tax)) 
 
+# test <- updated3 %>% full_join(taxa_data, by=c("Phylum", "Class", "Order", "Family", "Genus", "Species")) %>% 
+#   group_by_at(vars(13:14, 2:7)) %>%
+#   mutate(seq_taxa_reads_2 = sum(seq_taxa_reads), seq_tot_reads_2 = sum(seq_tot_reads), seq_taxa_per_tot_2 = seq_taxa_reads_2/seq_tot_reads_2*100) %>% 
+#   ungroup() %>%
+#   distinct_at(vars(13:14, 2:7), .keep_all = T)
+
 test <- updated3 %>% full_join(taxa_data, by=c("Phylum", "Class", "Order", "Family", "Genus", "Species")) %>% 
+  mutate(seq_tot_reads_2 = sum(seq_taxa_reads)) %>%
+  # mutate(test2 = sum(1256326+467404)) %>%
   group_by_at(vars(13:14, 2:7)) %>%
-  mutate(seq_taxa_reads_2 = sum(seq_taxa_reads), seq_tot_reads_2 = sum(seq_tot_reads), seq_taxa_per_tot_2 = seq_taxa_reads_2/seq_tot_reads_2*100) %>% 
+  mutate(seq_taxa_reads_2 = sum(seq_taxa_reads), seq_taxa_per_tot_2 = seq_taxa_reads_2/seq_tot_reads_2*100) %>% 
   ungroup() %>%
-  distinct_at(vars(13:14, 2:7), .keep_all = T)
+  distinct_at(vars(13:14, 2:7), .keep_all = T)%>% group_by_at(vars(13:14)) %>% mutate(test = sum(seq_taxa_per_tot_2))
 
 per_labs <- test %>%
   group_by_at(vars(13:14)) %>%
@@ -282,7 +290,7 @@ test %>% filter(AVITI == "FALSE")
 
 
 
-label_var = c("99.963%","0.0036%","0.069%")
+label_var = c("99.9637%","0.00179%","0.0345%")
 
 p2 <- upset(
   test,
